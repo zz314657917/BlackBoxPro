@@ -1,0 +1,177 @@
+package com.blackboxpro.neoforge.util
+
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import com.google.gson.JsonPrimitive
+import com.mojang.serialization.JsonOps
+import net.minecraft.client.Minecraft
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.network.chat.ClickEvent
+import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.ComponentSerialization
+import net.minecraft.network.chat.HoverEvent
+import net.minecraft.network.chat.Style
+import net.minecraft.network.chat.TextColor
+import java.util.Optional
+
+object ChatStyleHelper {
+
+    data class StyleMatch(
+        val matchedText: String,
+        val style: Style
+    )
+
+    fun findStyleMatch(raw: String, match: String): StyleMatch? {
+        val component = deserialize(raw) ?: return null
+        return findStyleMatch(component, match)
+    }
+
+    fun findStyleMatch(component: Component, match: String): StyleMatch? {
+        var result: StyleMatch? = null
+        component.visit({ style, text ->
+            if (result == null && text.contains(match)) {
+                result = StyleMatch(match, style)
+                Optional.of(text)
+            } else {
+                Optional.empty<String>()
+            }
+        }, Style.EMPTY)
+        return result
+    }
+
+    fun styleToJson(style: Style): JsonObject = JsonObject().apply {
+        style.clickEvent?.let { add("clickEvent", clickEventToJson(it)) }
+        style.hoverEvent?.let { add("hoverEvent", hoverEventToJson(it)) }
+        style.color?.let { addProperty("color", it.serialize()) }
+        if (style.isBold) addProperty("bold", true)
+        if (style.isItalic) addProperty("italic", true)
+        if (style.isUnderlined) addProperty("underlined", true)
+        if (style.isStrikethrough) addProperty("strikethrough", true)
+        if (style.isObfuscated) addProperty("obfuscated", true)
+        style.insertion?.let { addProperty("insertion", it) }
+    }
+
+    fun clickEventToJson(clickEvent: ClickEvent): JsonObject = JsonObject().apply {
+        addProperty("action", clickEvent.action().serializedName)
+        when (clickEvent) {
+            is ClickEvent.RunCommand -> addProperty("value", clickEvent.command())
+            is ClickEvent.SuggestCommand -> addProperty("value", clickEvent.command())
+            is ClickEvent.OpenUrl -> addProperty("value", clickEvent.uri().toString())
+            is ClickEvent.CopyToClipboard -> addProperty("value", clickEvent.value())
+            is ClickEvent.ChangePage -> addProperty("value", clickEvent.page())
+            is ClickEvent.OpenFile -> addProperty("value", clickEvent.path())
+            is ClickEvent.Custom -> {
+                addProperty("value", clickEvent.id().toString())
+                clickEvent.payload().ifPresent { addProperty("payload", it.toString()) }
+            }
+            is ClickEvent.ShowDialog -> addProperty("value", clickEvent.dialog().toString())
+        }
+    }
+
+    fun hoverEventToJson(hoverEvent: HoverEvent): JsonObject = JsonObject().apply {
+        addProperty("action", hoverEvent.action().serializedName)
+        when (hoverEvent) {
+            is HoverEvent.ShowText -> {
+                addProperty("contents", hoverEvent.value().string)
+                add("contentsJson", serializeComponent(hoverEvent.value()))
+            }
+
+            is HoverEvent.ShowItem -> {
+                add("contents", ItemStackSerializer.serialize(hoverEvent.item()))
+            }
+
+            is HoverEvent.ShowEntity -> {
+                val info = hoverEvent.entity()
+                add("contents", JsonObject().apply {
+                    addProperty("type", BuiltInRegistries.ENTITY_TYPE.getKey(info.type).toString())
+                    addProperty("id", info.uuid.toString())
+                    info.name.ifPresent { addProperty("name", it.string) }
+                })
+            }
+        }
+    }
+
+    fun serializeComponent(component: Component): JsonElement = runCatching {
+        val client = Minecraft.getInstance()
+        val ops = client.connection?.registryAccess()?.createSerializationContext(JsonOps.INSTANCE) ?: JsonOps.INSTANCE
+        ComponentSerialization.CODEC.encodeStart(ops, component).result().orElse(JsonPrimitive(component.string))
+    }.getOrElse {
+        JsonPrimitive(component.string)
+    }
+
+    fun componentToLegacyString(component: Component): String {
+        val builder = StringBuilder()
+        component.visit({ style, text ->
+            appendStyleCodes(builder, style)
+            builder.append(text)
+            Optional.empty<String>()
+        }, Style.EMPTY)
+        return builder.toString()
+    }
+
+    private fun deserialize(raw: String): Component? = runCatching {
+        val client = Minecraft.getInstance()
+        val ops = client.connection?.registryAccess()?.createSerializationContext(JsonOps.INSTANCE) ?: JsonOps.INSTANCE
+        ComponentSerialization.CODEC.parse(ops, JsonParser.parseString(raw)).result().orElse(null)
+    }.getOrNull()
+
+    private fun appendStyleCodes(builder: StringBuilder, style: Style) {
+        style.color?.let { builder.append('§').append(colorToLegacyCode(it)) }
+        if (style.isBold) builder.append("§l")
+        if (style.isItalic) builder.append("§o")
+        if (style.isUnderlined) builder.append("§n")
+        if (style.isStrikethrough) builder.append("§m")
+        if (style.isObfuscated) builder.append("§k")
+    }
+
+    private fun colorToLegacyCode(color: TextColor): Char = when (color.value) {
+        0x000000 -> '0'
+        0x0000AA -> '1'
+        0x00AA00 -> '2'
+        0x00AAAA -> '3'
+        0xAA0000 -> '4'
+        0xAA00AA -> '5'
+        0xFFAA00 -> '6'
+        0xAAAAAA -> '7'
+        0x555555 -> '8'
+        0x5555FF -> '9'
+        0x55FF55 -> 'a'
+        0x55FFFF -> 'b'
+        0xFF5555 -> 'c'
+        0xFF55FF -> 'd'
+        0xFFFF55 -> 'e'
+        0xFFFFFF -> 'f'
+        else -> findNearestLegacyCode(color.value)
+    }
+
+    private fun findNearestLegacyCode(rgb: Int): Char {
+        val r = rgb shr 16 and 0xFF
+        val g = rgb shr 8 and 0xFF
+        val b = rgb and 0xFF
+        val legacyColors = mapOf(
+            '0' to 0x000000,
+            '1' to 0x0000AA,
+            '2' to 0x00AA00,
+            '3' to 0x00AAAA,
+            '4' to 0xAA0000,
+            '5' to 0xAA00AA,
+            '6' to 0xFFAA00,
+            '7' to 0xAAAAAA,
+            '8' to 0x555555,
+            '9' to 0x5555FF,
+            'a' to 0x55FF55,
+            'b' to 0x55FFFF,
+            'c' to 0xFF5555,
+            'd' to 0xFF55FF,
+            'e' to 0xFFFF55,
+            'f' to 0xFFFFFF
+        )
+        return legacyColors.minBy { (_, value) ->
+            val dr = r - (value shr 16 and 0xFF)
+            val dg = g - (value shr 8 and 0xFF)
+            val db = b - (value and 0xFF)
+            dr * dr + dg * dg + db * db
+        }.key
+    }
+}

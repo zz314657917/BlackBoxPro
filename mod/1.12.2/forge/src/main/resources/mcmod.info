@@ -1,0 +1,15 @@
+[
+  {
+    "modid": "blackboxpro",
+    "name": "BlackBoxPro Forge",
+    "description": "BlackBoxPro client mod for Forge 1.12.2.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "",
+    "authorList": [],
+    "credits": "",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]

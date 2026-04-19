@@ -1,0 +1,58 @@
+# Gradle
+.gradle/
+build/
+**/build/
+.gradle-user-home
+.gradle-user-home-common
+.gradle-user-home-root
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Kotlin
+.kotlin/
+
+# Fabric Loom
+**/run/
+**/loom-cache/
+
+# NeoForge ModDev
+**/runs/
+
+# Claude / Narrafork
+.narrafork/
+.worktrees/
+.claude/*
+!.claude/skills
+!.claude/commands/
+!.claude/commands/**
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 反编译参考代码
+net/
+
+# plugin 子项目 Gradle wrapper（跟随根项目即可）
+plugin/.gradle/
+plugin/gradle/
+plugin/gradlew
+plugin/gradlew.bat
+
+# mod/1.12.2 独立构建的 Gradle 缓存
+mod/1.12.2/.gradle/
+
+# 文档目录纳入版本控制
+
+# 测试结果与运行产物
+artifacts/test-results/
+logs/
+META-INF/
+*.log
+*.log.gz
