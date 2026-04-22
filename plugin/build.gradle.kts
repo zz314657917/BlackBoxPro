@@ -10,7 +10,7 @@ import java.util.Properties
 
 plugins {
     java
-    id("io.izzel.taboolib") version "2.0.30"
+    id("io.izzel.taboolib") version "2.0.36"
     id("org.jetbrains.kotlin.jvm") version "2.2.0"
     `maven-publish`
 }

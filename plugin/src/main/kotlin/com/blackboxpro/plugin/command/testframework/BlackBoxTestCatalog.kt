@@ -441,6 +441,11 @@ object BlackBoxTestCatalog {
         "sneak_start", "sneak_stop", "sprint_start", "sprint_stop", "jump", "swap_hands", "leave_bed", "drop_item", "drop_item_stack", "perform_respawn" -> JsonObject()
         "chat_message" -> JsonObject().apply { addProperty("message", "[BlackBoxPro] full action test") }
         "chat_command" -> JsonObject().apply { addProperty("command", "me BlackBoxPro full test") }
+        "click_chat_text" -> JsonObject().apply {
+            addProperty("match", "默认频道")
+            addProperty("index", 1)
+            addProperty("execute", false)
+        }
         "set_carried_item", "creative_set_slot" -> JsonObject().apply { addProperty("slot", 0) }
         "client_information" -> JsonObject().apply {
             addProperty("locale", "zh_cn")
@@ -492,6 +497,10 @@ object BlackBoxTestCatalog {
         "query_held_item" -> JsonObject().apply { addProperty("hand", "main_hand") }
         "query_inventory_slot" -> JsonObject().apply { addProperty("slot", 0) }
         "query_chat_history" -> JsonObject().apply { addProperty("count", 5) }
+        "query_chat_style" -> JsonObject().apply {
+            addProperty("match", "默认频道")
+            addProperty("index", 1)
+        }
         "query_nearby_entities" -> JsonObject().apply {
             addProperty("radius", 16.0)
             addProperty("limit", 20)

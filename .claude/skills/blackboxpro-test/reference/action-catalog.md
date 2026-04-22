@@ -1,6 +1,6 @@
 # BlackBoxPro Action 完整目录
 
-按功能分类，共 98 个 Action（1.21.11 端 92 个，1.12.2 端 81 个）。
+按功能分类，共 116 个 Action（1.21.x 端 116 个，1.12.2 端 105 个）。
 
 > 参考快照；若与运行时代码不一致，以 `ActionCatalog.kt` 与各端 `ActionRegistry.kt` 为准。
 
@@ -128,7 +128,7 @@
 | | index | Int | 0 | 聊天历史索引（0=最新） |
 | | execute | Boolean | true | 是否执行 ClickEvent |
 
-## 7. 客户端设置（9 个）✅
+## 7. 客户端设置（10 个）✅
 
 | Action ID | 参数 | 类型 | 默认值 | 说明 |
 |-----------|------|------|--------|------|
@@ -153,6 +153,7 @@
 | `connect_to_server` | **ip** | String | — | 服务器 IP |
 | | port | Int | 25565 | 服务器端口 |
 | `close_screen` | （无） | | | 关闭当前屏幕 |
+| `open_inventory` | （无） | | | 打开玩家背包屏幕 |
 | `create_world` | **worldName** | String | — | 世界名称 |
 | | gameMode | String | "survival" | 游戏模式（survival/creative/hardcore） |
 | | difficulty | String | "normal" | 难度（peaceful/easy/normal/hard） |

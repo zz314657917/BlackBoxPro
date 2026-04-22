@@ -5,6 +5,10 @@
 - 当前代码真实主链是 HTTP 中继，不是服务端 Plugin Message Channel。
 - README、AGENTS 和部分旧开发文档仍保留旧架构描述，阅读时必须带着“历史背景文档”的心态。
 - 如果后续有人要继续开发 transport、测试框架或构建脚本，先看代码，再看旧文档。
+- 本地 test-cell 现在分成两套池：
+  - `1.12.2` 仍用 `cell-01..05`
+  - Forge `1.20.1` 独立用 `cell-06..08` + `cells-1201.json` + 专用 `Invoke/Provision/Sync/Stop` 脚本
+- Forge `1.20.1` 客户端路线已经切到“精简 mod”模式，默认只保留 `BlackBoxPro` 客户端模组，不再沿用整合包第三方 mod 列表。
 
 ## 已确认的现状差异
 

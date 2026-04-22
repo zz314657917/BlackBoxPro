@@ -1,26 +1,62 @@
 ---
 name: blackboxpro-test
-description: 部署并测试 BlackBoxPro 黑盒测试环境。两种模式：客户端自测（单人世界 HTTP 直达 mod:38081）和服务端联调（plugin:38080 转发 mod:38081）。覆盖构建、部署、环境检测、测试、截图视觉分析；启动前必须检查并释放 25565/38080/38081 的对应旧实例端口占用，且禁止由 AI 代启动客户端或服务端。
+description: 部署并测试 BlackBoxPro 黑盒测试环境。优先使用仓库内受管 test-cell 池：1.12.2 `cell-01..05` 与 Forge 1.20.1 `cell-06..08`；需要时再回退到手工客户端自测和服务端联调。覆盖构建、artifact 同步、状态、抢占、ensure/smoke、截图视觉分析；允许通过受管脚本拉起和停止 cell，但禁止绕过脚本随意启动未知客户端或服务端。
 ---
 
-BlackBoxPro 自动化测试部署技能。根据用户指定的版本和模式，执行构建→部署→环境检测→测试→清理流程；**不负责代启动任何长驻客户端/服务端进程**。
+BlackBoxPro 自动化测试部署技能。根据用户指定的版本和模式，执行构建→部署→环境检测→测试→清理流程；当前仓库内本地回归**优先走受管 test-cell 脚本**，不要先退回手工 launcher / `runClient` / 直启 `java -jar`。
+
+## 当前推荐入口（优先）
+
+- 在 `F:/mcplugins/BlackBoxPro-dev-2.0` 仓库内做本地验证时，默认优先使用 `scripts/test-cells/` 下的受管脚本，而不是手工启动客户端或服务端。
+- 当前有两套池：
+  - `1.12.2`：`cell-01..05`，配置文件 `scripts/test-cells/cells.json`
+  - Forge `1.20.1`：`cell-06..08`，配置文件 `scripts/test-cells/cells-1201.json`
+- Forge `1.20.1` 当前固定使用专用脚本：
+  - `Provision-TestCells1201.ps1`
+  - `Sync-TestCell1201Artifacts.ps1`
+  - `Invoke-TestCell1201.ps1`
+  - `Stop-AllTestCells1201.ps1`
+  - `Sync-TestCell1201Artifacts.ps1` 只允许同步正式运行 jar，禁止把 `*-dev-run.jar` 推进 cell
+- Forge `1.20.1` 客户端路线是“精简 mod”：
+  - `assets` / `libraries` 用 junction 共享
+  - 每个 cell 的 `mods/` 只保留 `BlackBoxPro-forge-1.20.1-*.jar`
+  - 整合包第三方 mod 和侧车目录不保留
+- Forge `1.20.1` 当前池默认内存已收口为：
+  - 服务端 `1G / 1G`
+  - 客户端 `1G / 1G`
+- Forge `1.20.1` 端口段：
+  - `cell-06`：`25615 / 38130 / 38131`
+  - `cell-07`：`25625 / 38140 / 38141`
+  - `cell-08`：`25635 / 38150 / 38151`
+
+## 选择顺序
+
+1. 用户要做本仓库本地回归、smoke、联机验证或 QQFarm 闭环验证：优先走受管 test-cell 池。
+2. 用户明确点名 `cell-06..08`、`cells-1201.json`、`Invoke-TestCell1201.ps1`：直接走 Forge `1.20.1` 受管池。
+3. 只有在“外部接入项目”或“仓库内不存在可用 cell / 脚本”时，才回退到下文的手工方案 A / B。
+
+## Shell 约定
+
+- 当前仓库默认环境是 Windows + PowerShell。
+- 下文命令示例优先按 PowerShell 语义理解和执行，不要把 Bash 片段原样混用到 PowerShell。
+- 如果只是表达 HTTP 调用格式，允许保留 `curl` 作为接口示意；真正执行时优先换成 `Invoke-WebRequest` 或 `Invoke-RestMethod`。
 
 ## 参考资源（Level 3 按需加载）
 
-本技能的 `reference/` 目录包含以下资源，**不要预加载**，在需要时用 Read 工具按需读取：
+本技能的 `reference/` 目录包含以下资源，**不要预加载**，在需要时用当前平台可用的读文件工具按需读取：
 
 | 文件 | 用途 | 何时读取 |
 |------|------|---------|
-| `reference/action-catalog.md` | 全部 108 个 Action 的 ID、参数、分类快照 | 用户问"有哪些 action"、需要查参数、按分类筛选时 |
+| `reference/action-catalog.md` | 当前 action ID、参数、分类快照 | 用户问"有哪些 action"、需要查参数、按分类筛选时 |
 | `reference/http-api.md` | HTTP 端点格式（请求/响应 JSON 结构） | 需要确认 API 调用格式时 |
 | `reference/register-action.md` | 注册第三方自定义 Action 的完整流程 | 用户要添加新 action、扩展测试能力时 |
 
 > `reference/action-catalog.md` 只是便于检索的快照；若与实际代码不一致，以 `common/src/main/kotlin/com/blackboxpro/common/action/ActionCatalog.kt` 和对应 loader 的 `ActionRegistry.kt` 为准，尤其注意 `connect_to_server`、`close_screen` 这类容易遗漏的会话类 action。
 
 示例场景：
-- 用户："查询类的 action 有哪些？" → Read `reference/action-catalog.md`，定位"查询行为"章节
-- 用户："screenshot 需要什么参数？" → Read `reference/action-catalog.md`，搜索 `screenshot`
-- 用户："请求格式是什么？" → Read `reference/http-api.md`
+- 用户："查询类的 action 有哪些？" → 读取 `reference/action-catalog.md`，定位"查询行为"章节
+- 用户："screenshot 需要什么参数？" → 读取 `reference/action-catalog.md`，搜索 `screenshot`
+- 用户："请求格式是什么？" → 读取 `reference/http-api.md`
 - 用户："我需要一个 xxx action" → 先查 `reference/action-catalog.md`，找不到再查 `ActionCatalog.kt` / `ActionRegistry.kt`，仍不存在再引导注册自定义 action（见下方"找不到 Action 的处理流程"）
 
 ### 找不到 Action 的处理流程
@@ -35,7 +71,7 @@ BlackBoxPro 自动化测试部署技能。根据用户指定的版本和模式�
     │   └─ 未找到 → Step 1.5
     │
     ├─ Step 1.5：查代码事实源
-    │   ├─ Read common/.../ActionCatalog.kt
+    │   ├─ 读取 common/.../ActionCatalog.kt
     │   ├─ 必要时再查对应 loader 的 ActionRegistry.kt
     │   ├─ 找到匹配 → 直接使用，顺便指出 reference 快照已滞后
     │   └─ 仍未找到 → Step 2
@@ -44,12 +80,12 @@ BlackBoxPro 自动化测试部署技能。根据用户指定的版本和模式�
     │   ├─ 有相近替代方案 → 告知用户，说明差异
     │   └─ 无替代 → Step 3
     │
-    └─ Step 3：引导注册自定义 Action（Read register-action.md）
+    └─ Step 3：引导注册自定义 Action（读取 register-action.md）
 ```
 
 #### Step 3：注册自定义 Action 流程
 
-Read `reference/register-action.md` 获取完整 API，然后按以下步骤引导用户：
+读取 `reference/register-action.md` 获取完整 API，然后按以下步骤引导用户：
 
 **① 实现 ActionExecutor**
 
@@ -108,16 +144,17 @@ curl -s --max-time 8 -X POST http://localhost:38081/execute \
 
 ### 非阻塞规则
 
-**禁止由 AI 调起任何长驻/阻塞型进程。** 包括但不限于：
-- 启动 Minecraft 客户端（`runClient`、启动器、PCL、外部 launcher、对应 Terminal/Skill）
-- 启动 Paper/Spigot 服务端（`java -jar ... nogui`、对应 Terminal/Skill）
-- 任何会持续占用终端并导致后续步骤悬挂等待的命令
-- 但允许使用 NarraFork 对话中启动的 Terminal 并自动执行命令
+**默认禁止绕过受管脚本直接调起任意未知客户端/服务端长驻进程。** 允许的例外是：当前仓库内已经验证过的 test-cell 编排脚本。
 
 执行边界：
-- **允许**：构建、复制产物、编辑配置、有限时 `curl` 请求、读取已有日志/状态、停止旧实例、轮询短时就绪状态
-- **禁止**：使用 `Bash run_in_background: true` 启动客户端/服务端，或调用任何用于启动 client/server 的 Skill / Terminal
-- 若测试所需环境未运行：**立即停止自动流程**，输出配置中的启动命令、工作目录、`JAVA_HOME` 与就绪判定方式，要求用户在外部终端或已有会话手动启动；检测到 `:38080` / `:38081` 就绪后再继续
+- **允许**：
+  - 构建、复制产物、编辑配置、有限时 `curl` 请求、读取已有日志/状态、停止旧实例、轮询短时就绪状态
+  - 调用仓库内的受管脚本：`Get-TestCellStatus.ps1`、`Acquire-TestCell.ps1`、`Release-TestCell.ps1`、`Invoke-TestCell.ps1`、`Invoke-TestCell1201.ps1`、`Provision-TestCells1201.ps1`、`Sync-TestCell1201Artifacts.ps1`、`Stop-AllTestCells*.ps1`
+  - 通过这些脚本拉起和停止**受管** `cell-01..08`
+- **禁止**：
+  - 绕过受管脚本直接运行 `runClient`、外部启动器、`java -jar ... nogui` 去启未知环境
+  - 接管不属于当前 test-cell 池的任意用户终端 / 启动器
+- 若当前任务不在受管 test-cell 池内，且测试环境未运行：再退回到“输出启动命令、由用户手动启动”的模式；不要自己直启外部客户端或服务端
 
 ### 轮询规则
 
@@ -137,13 +174,19 @@ curl -s --max-time 8 -X POST http://localhost:38081/execute \
 | 世界创建/加入 | 已由 curl 阻塞等待响应，无需轮询（curl 自带 --max-time 90） | | | |
 | 客户端连接服务器 | 3s | 20 | 60s | 服务端日志包含 `joined the game` |
 
-轮询实现：使用 Bash `for` 循环 + `sleep`，例如：
-```bash
-for i in $(seq 1 40); do
-  curl -sf http://localhost:38081/status > /dev/null 2>&1 && break
-  [ $i -eq 40 ] && echo "FAIL: Mod HTTP not ready after 120s" && exit 1
-  sleep 3
-done
+轮询实现：使用 PowerShell 循环 + `Start-Sleep`，例如：
+```powershell
+for ($i = 1; $i -le 40; $i++) {
+  try {
+    Invoke-WebRequest -Uri "http://localhost:38081/status" -UseBasicParsing -TimeoutSec 3 | Out-Null
+    break
+  } catch {
+    if ($i -eq 40) {
+      throw "FAIL: Mod HTTP :38081 not ready after 120s"
+    }
+    Start-Sleep -Seconds 3
+  }
+}
 ```
 
 ### 环境准备规则
@@ -152,6 +195,10 @@ done
 
 - 客户端相关：检查 `38081`；若占用，先停止旧的 Mod / 客户端进程，确认端口释放后再继续。
 - 服务端相关：检查 `25565` 与 `38080`；若占用，优先对旧服务端执行 `stop_server`（`38080` 可访问时），再处理残留服务端进程，确认两个端口都释放后再继续。
+- Forge `1.20.1` 受管池还要检查：
+  - `cell-06`：`25615 / 38130 / 38131`
+  - `cell-07`：`25625 / 38140 / 38141`
+  - `cell-08`：`25635 / 38150 / 38151`
 - 两个 MC 版本共用这些端口，**禁止并行保留两个版本实例**；发现旧版本残留时必须先清理。
 
 #### 旧实例清理状态机（统一流程）
@@ -184,7 +231,11 @@ done
 ### 工程/配置约定（非常重要）
 
 - **本技能运行目录 = 接入/使用 BBP 的项目仓库根目录**（即你当前执行技能的项目）。
-- **配置文件也属于接入项目**：每次执行前必须先读取 `./.Codex/config/blackboxpro-env.json`（不是 BBP 仓库里的配置）。
+- 若当前任务就是在 `F:/mcplugins/BlackBoxPro-dev-2.0` 仓库内做本地回归：
+  - `1.12.2` 直接使用 `scripts/test-cells/cells.json`
+  - Forge `1.20.1` 直接使用 `scripts/test-cells/cells-1201.json`
+  - 这一路径**不依赖**外部接入项目配置文件
+- 只有在“外部接入项目”里使用 BBP 时，才读取项目内 `./.claude/config/blackboxpro-env.json`（不是 BBP 仓库里的配置）。
 
 ### 定位或拉取 BBP 仓库（bbp.* → BBP_ROOT）
 
@@ -204,16 +255,20 @@ done
 3. 校验：`BBP_ROOT` 下必须存在 `gradlew` 或 `gradlew.bat`
 
 示例脚本（git 模式，在“接入项目根目录”执行）：
-```bash
-CLONE_DIR="<bbp.git.cloneDir>"
-[ -d "$CLONE_DIR/.git" ] || git clone "<bbp.git.url>" "$CLONE_DIR"
-[ -z "<bbp.git.ref>" ] || (cd "$CLONE_DIR" && git checkout "<bbp.git.ref>")
-BBP_ROOT="$CLONE_DIR"
+```powershell
+$cloneDir = "<bbp.git.cloneDir>"
+if (-not (Test-Path (Join-Path $cloneDir ".git"))) {
+  git clone "<bbp.git.url>" $cloneDir
+}
+if (-not [string]::IsNullOrWhiteSpace("<bbp.git.ref>")) {
+  git -C $cloneDir checkout "<bbp.git.ref>"
+}
+$BBP_ROOT = $cloneDir
 ```
 
 ### 运行参数配置（versions.*）
 
-若关键字段为空，暂停流程，用 AskUserQuestion 逐项询问后回填配置文件。
+若关键字段为空，暂停流程，向用户逐项询问后回填配置文件。
 
 **方案 A 必填项**：`client.launchCommand`
 **方案 B 额外必填**：`server.directory` + `server.jar`
@@ -260,8 +315,34 @@ BBP_ROOT="$CLONE_DIR"
 
 | 模式 | 名称 | 描述 | HTTP 端口 |
 |------|------|------|-----------|
-| A | 客户端自测 | 仅 Mod，单人世界，无需服务端 | 直达 `:38081` |
-| B | 服务端联调 | Plugin + Mod，多人服务器 | Plugin `:38080` 转发 Mod `:38081` |
+| A | 客户端自测 | 仅 Mod，单人世界，无需服务端；仓库内优先用受管 cell 而不是手工 runClient | 直达 `:38081` |
+| B | 服务端联调 | Plugin + Mod，多人服务器；仓库内优先用 `Invoke-TestCell*.ps1` 管理 | Plugin `:38080` 转发 Mod `:38081` |
+
+## 受管 test-cell 快速入口
+
+### 1.12.2
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Get-TestCellStatus.ps1"
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Acquire-TestCell.ps1" -Owner "session-name" -ReadyOnly
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode ensure -CellId cell-01
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode smoke -CellId cell-01
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode stop -CellId cell-01
+```
+
+### Forge 1.20.1
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Provision-TestCells1201.ps1"
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Get-TestCellStatus.ps1" -ConfigPath "scripts/test-cells/cells-1201.json"
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Acquire-TestCell.ps1" -Owner "session-name" -ConfigPath "scripts/test-cells/cells-1201.json" -ReadyOnly
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Sync-TestCell1201Artifacts.ps1"
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell1201.ps1" -Mode ensure -CellId cell-06
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell1201.ps1" -Mode smoke -CellId cell-06
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Stop-AllTestCells1201.ps1"
+```
+
+- `Sync-TestCell1201Artifacts.ps1` 当前应只使用 `BlackBoxPro-forge-1.20.1-*.jar` 的正式运行产物，不应把 `*-dev-run.jar`、zip 包或其他调试产物复制进 `mods/`。
 
 ## 产物路径（相对 BBP_ROOT）
 
@@ -462,7 +543,7 @@ curl -s --max-time 8 -X POST http://localhost:38081/execute \
 
 ### A6. 截图视觉分析
 
-从 screenshot 响应中提取 `data.filePath`，用 Read 工具读取 PNG 进行视觉验证。
+从 screenshot 响应中提取 `data.filePath`，用当前平台可用的文件/图片读取工具检查 PNG 进行视觉验证。
 
 截图路径：
 - 1.21.x：`mod/<resolvedVersion>/<resolvedLoader>/run/screenshots/blackboxpro/`
@@ -523,8 +604,8 @@ curl -s --max-time 8 -X POST http://localhost:38081/execute \
 
 从配置文件读取 `server.pluginDir`（或 `server.directory + "/plugins"`）：
 
-```bash
-cp <BBP_ROOT>/plugin/build/libs/BlackBoxPro-Plugin-*.jar <server.directory>/plugins/
+```powershell
+Copy-Item "<BBP_ROOT>/plugin/build/libs/BlackBoxPro-Plugin-*.jar" "<server.directory>/plugins/" -Force
 ```
 
 > Plugin jar 被服务端占用时无法覆盖，必须先停服再部署再启服。
@@ -685,11 +766,15 @@ curl -s --max-time 8 -X POST http://localhost:38080/execute \
 | Plugin HTTP | 38080 | 测试脚本指令入口（方案 B） |
 | Mod HTTP | 38081 | Mod 直达（方案 A）/ Plugin 转发目标（方案 B） |
 | Minecraft Server | 25565 | 游戏连接 |
+| Forge 1.20.1 `cell-06` | `25615 / 38130 / 38131` | 受管 test-cell |
+| Forge 1.20.1 `cell-07` | `25625 / 38140 / 38141` | 受管 test-cell |
+| Forge 1.20.1 `cell-08` | `25635 / 38150 / 38151` | 受管 test-cell |
 
 ## 注意事项
 
 - 两个 MC 版本不要同时启动（都占用 25565 和 38081）
 - 每次启动前必须检查并释放 `25565` / `38080` / `38081` 的旧实例占用，确认端口空闲后再继续
+- Forge `1.20.1` 池当前默认是 `1G / 1G`（服务端/客户端都为 `1024 / 1024`）；除非用户明确要求，否则按 `cells-1201.json` 当前值执行
 - 修改 Plugin 后必须停服 → 部署 → 重启
 - 修改 Mod 后需重启客户端
 - 所有控制通过 HTTP，禁止使用 RCON

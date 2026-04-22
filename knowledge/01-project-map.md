@@ -35,7 +35,7 @@
 
 - 仍保留完整的 `runtime/fabric/neoforge` 三段结构。
 - 这一线是旧现代端兼容线，Gradle 属性来自 `mod/1.21.1/gradle.properties`，不走根目录的 `minecraft_version=1.21.11`。
-- `1.21.1` NeoForge 产物由根构建任务 `mod1211_pack_neoforge` 额外手工打包。
+- 当前根构建不再提供 `1.21.1` 专用包装任务，也不会默认收集这一线产物；如需继续构建，改在 `mod/` 聚合工程内显式执行对应子模块任务。
 
 ### `mod/1.12.2`
 

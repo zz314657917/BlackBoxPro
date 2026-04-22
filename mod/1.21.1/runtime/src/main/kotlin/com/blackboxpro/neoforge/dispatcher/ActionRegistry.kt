@@ -62,6 +62,7 @@ object ActionRegistry {
         register("interact_entity", InteractEntityAction())
         register("interact_entity_at", InteractEntityAtAction())
         register("swing_arm", SwingArmAction())
+        register("left_click", LeftClickAction())
 
         // === 容器/GUI 操作 ===
         register("click_slot", ClickSlotAction())
@@ -170,6 +171,7 @@ object ActionRegistry {
         register("query_scoreboard", QueryScoreboardAction())
         register("query_screen_state", QueryScreenStateAction())
         register("query_boss_bar", QueryBossBarAction())
+        register("query_tooltip_state", QueryTooltipStateAction())
         register("query_chat_style", QueryChatStyleAction())
         register("query_slot_tooltip", QuerySlotTooltipAction())
 

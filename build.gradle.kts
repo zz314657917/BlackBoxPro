@@ -13,19 +13,23 @@ val syncTaskClass = Class.forName("org.gradle.api.tasks.Sync") as Class<Sync>
 val rootGradlew = if (isWindows) file("gradlew.bat") else file("gradlew")
 val pluginGradlew = if (isWindows) file("plugin/gradlew.bat") else file("plugin/gradlew")
 val forge1122Gradlew = if (isWindows) file("mod/1.12.2/gradlew.bat") else file("mod/1.12.2/gradlew")
-val jarExecutable = if (isWindows) file(System.getProperty("java.home") + "/bin/jar.exe") else file(System.getProperty("java.home") + "/bin/jar")
+val forge1201Gradlew = if (isWindows) file("mod/1.20.1/gradlew.bat") else file("mod/1.20.1/gradlew")
 val commonProjectDir = file("common")
 val modProjectDir = file("mod")
 val pluginProjectDir = file("plugin")
 val forge1122ProjectDir = file("mod/1.12.2")
-val commonGradleUserHome = file(".gradle-user-home/common")
+val forge1201ProjectDir = file("mod/1.20.1")
 val forge1122GradleUserHome = file(".gradle-user-home/forge1122")
-val rootProps = java.util.Properties()
-val rootPropsStream = java.io.FileInputStream(file("gradle.properties"))
-rootProps.load(rootPropsStream)
-rootPropsStream.close()
-val projectVersion = rootProps.getProperty("version", "0.0.0")
-val mod1211NeoForgeJar = file("mod/1.21.1/neoforge/build/libs/BlackBoxPro-neoforge-1.21.1-" + projectVersion + ".jar")
+val forge1201GradleUserHome = file(".gradle-user-home/forge1201")
+val localTemurin21Home = file("../.local-tools/temurin21/jdk-21.0.10+7")
+
+fun Exec.configureLocalJava21IfPresent() {
+    if (localTemurin21Home.isDirectory) {
+        environment("JAVA_HOME", localTemurin21Home.absolutePath)
+        val currentPath = System.getenv("PATH") ?: ""
+        environment("PATH", localTemurin21Home.resolve("bin").absolutePath + java.io.File.pathSeparator + currentPath)
+    }
+}
 
 tasks.register("common_build", execTaskClass, object : Action<Exec> {
     override fun execute(task: Exec) {
@@ -89,6 +93,40 @@ tasks.register("forge1122_clean", execTaskClass, object : Action<Exec> {
     }
 })
 
+tasks.register("forge1201_build", execTaskClass, object : Action<Exec> {
+    override fun execute(task: Exec) {
+        task.group = "standalone"
+        task.description = "build 独立项目 1.20.1 Forge"
+        task.workingDir = forge1201ProjectDir
+        task.configureLocalJava21IfPresent()
+        task.commandLine(
+            forge1201Gradlew.absolutePath,
+            "-g",
+            forge1201GradleUserHome.absolutePath,
+            "--no-daemon",
+            "clean",
+            "build"
+        )
+    }
+})
+
+tasks.register("forge1201_clean", execTaskClass, object : Action<Exec> {
+    override fun execute(task: Exec) {
+        task.group = "standalone"
+        task.description = "clean 独立项目 1.20.1 Forge"
+        task.workingDir = forge1201ProjectDir
+        task.configureLocalJava21IfPresent()
+        task.commandLine(
+            forge1201Gradlew.absolutePath,
+            "-g",
+            forge1201GradleUserHome.absolutePath,
+            "--no-daemon",
+            "clean"
+        )
+        task.isIgnoreExitValue = true
+    }
+})
+
 tasks.register("mod2111_build", execTaskClass, object : Action<Exec> {
     override fun execute(task: Exec) {
         task.group = "standalone"
@@ -106,46 +144,6 @@ tasks.register("mod2111_build", execTaskClass, object : Action<Exec> {
     }
 })
 
-tasks.register("mod1211_build", execTaskClass, object : Action<Exec> {
-    override fun execute(task: Exec) {
-        task.group = "standalone"
-        task.description = "构建 mod 1.21.1 客户端产物"
-        task.workingDir = rootDir
-        task.commandLine(
-            rootGradlew.absolutePath,
-            "-p",
-            modProjectDir.absolutePath,
-            "--no-daemon",
-            ":1.21.1:runtime:build",
-            ":1.21.1:fabric:build",
-            ":1.21.1:neoforge:classes",
-            ":1.21.1:neoforge:processResources"
-        )
-    }
-})
-
-tasks.register("mod1211_pack_neoforge", execTaskClass, object : Action<Exec> {
-    override fun execute(task: Exec) {
-        mod1211NeoForgeJar.parentFile.mkdirs()
-        task.group = "standalone"
-        task.description = "打包 mod 1.21.1 NeoForge 客户端 jar"
-        task.workingDir = rootDir
-        task.dependsOn("mod1211_build")
-        task.commandLine(
-            jarExecutable.absolutePath,
-            "--create",
-            "--file",
-            mod1211NeoForgeJar.absolutePath,
-            "-C",
-            file("mod/1.21.1/neoforge/build/classes/kotlin/main").absolutePath,
-            ".",
-            "-C",
-            file("mod/1.21.1/runtime/build/classes/kotlin/main").absolutePath,
-            "."
-        )
-    }
-})
-
 val collectJars = tasks.register("collectJars", syncTaskClass, object : Action<Sync> {
     override fun execute(task: Sync) {
         task.group = "build"
@@ -154,9 +152,8 @@ val collectJars = tasks.register("collectJars", syncTaskClass, object : Action<S
         // 1.21.11
         task.from(fileTree("mod/1.21.11/fabric/build/libs"))
         task.from(fileTree("mod/1.21.11/neoforge/build/libs"))
-        // 1.21.1
-        task.from(fileTree("mod/1.21.1/fabric/build/libs"))
-        task.from(fileTree("mod/1.21.1/neoforge/build/libs"))
+        // 1.20.1
+        task.from(fileTree("mod/1.20.1/build/libs"))
         // 1.12.2
         task.from(fileTree("mod/1.12.2/forge/build/libs"))
         // plugin
@@ -167,8 +164,8 @@ val collectJars = tasks.register("collectJars", syncTaskClass, object : Action<S
 tasks.register("buildAll", object : Action<Task> {
     override fun execute(task: Task) {
         task.group = "build"
-        task.description = "构建 common、1.21.11/1.21.1 客户端、1.12.2 客户端与服务端插件并收集 jar 到根 build/libs"
-        task.dependsOn("common_build", "mod2111_build", "mod1211_pack_neoforge", "plugin_build", "forge1122_build")
+        task.description = "构建 common、1.21.11、1.20.1、1.12.2 客户端与服务端插件并收集 jar 到根 build/libs"
+        task.dependsOn("common_build", "mod2111_build", "plugin_build", "forge1122_build", "forge1201_build")
         task.finalizedBy(collectJars)
     }
 })
@@ -177,7 +174,7 @@ tasks.register("cleanAll", object : Action<Task> {
     override fun execute(task: Task) {
         task.group = "build"
         task.description = "清理所有模块的 build 目录（含根 build 目录）"
-        task.dependsOn("plugin_clean", "forge1122_clean")
+        task.dependsOn("plugin_clean", "forge1122_clean", "forge1201_clean")
         task.doLast {
             delete(
                 layout.buildDirectory,
@@ -190,6 +187,7 @@ tasks.register("cleanAll", object : Action<Task> {
                 file("mod/1.21.1/runtime/build"),
                 file("mod/1.21.1/fabric/build"),
                 file("mod/1.21.1/neoforge/build"),
+                file("mod/1.20.1/build"),
                 file("mod/1.12.2/build"),
                 file("mod/1.12.2/runtime/build"),
                 file("mod/1.12.2/forge/build")

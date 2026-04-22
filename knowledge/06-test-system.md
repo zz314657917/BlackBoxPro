@@ -1,5 +1,69 @@
 # BlackBoxPro 测试系统
 
+## 当前环境编排
+
+### test-cell 池
+
+- 当前 1.12.2 本地回归统一走 `cell-01..05`。
+- 当前 Forge 1.20.1 本地回归走独立的 `cell-06..08`，配置文件固定为 `scripts/test-cells/cells-1201.json`，不混入原 `cells.json`。
+- 服务端目录：
+  - `cell-01` -> `F:/minecraft/test-cells/server-cell-01`
+  - `cell-02` -> `F:/minecraft/test-cells/server-cell-02`
+  - `cell-03` -> `F:/minecraft/test-cells/server-cell-03`
+  - `cell-04` -> `F:/minecraft/test-cells/server-cell-04`
+  - `cell-05` -> `F:/minecraft/test-cells/server-cell-05`
+  - `cell-06` -> `F:/minecraft/test-cells/server-cell-1201-06`
+  - `cell-07` -> `F:/minecraft/test-cells/server-cell-1201-07`
+  - `cell-08` -> `F:/minecraft/test-cells/server-cell-1201-08`
+- 客户端 `bot` 目录：
+  - `cell-01` -> `G:/MC/game/BlackBoxProTestCells/cell-01/.minecraft/versions/bot`
+  - `cell-02` -> `G:/MC/game/BlackBoxProTestCells/cell-02/.minecraft/versions/bot`
+  - `cell-03` -> `G:/MC/game/BlackBoxProTestCells/cell-03/.minecraft/versions/bot`
+  - `cell-04` -> `G:/MC/game/BlackBoxProTestCells/cell-04/.minecraft/versions/bot`
+  - `cell-05` -> `G:/MC/game/BlackBoxProTestCells/cell-05/.minecraft/versions/bot`
+  - `cell-06` -> `G:/MC/game/BlackBoxProTestCells/cell-06/.minecraft/versions/1.20.1-Forge_47.3.0`
+  - `cell-07` -> `G:/MC/game/BlackBoxProTestCells/cell-07/.minecraft/versions/1.20.1-Forge_47.3.0`
+  - `cell-08` -> `G:/MC/game/BlackBoxProTestCells/cell-08/.minecraft/versions/1.20.1-Forge_47.3.0`
+
+### 客户端共享资源
+
+- 每个 cell 自己持有 `versions/bot`。
+- `1.20.1` 路线每个 cell 自己持有独立的 `versions/1.20.1-Forge_47.3.0`。
+- 但 `assets` 与 `libraries` 当前通过 junction 共享：
+  - `G:/MC/game/AAA枫叶大陆服务器/.minecraft/assets`
+  - `G:/MC/game/AAA枫叶大陆服务器/.minecraft/libraries`
+- 如果客户端启动异常，先检查 junction 是否还指向这两个共享目录。
+- `1.20.1` 路线已改成“精简 mod 客户端”：
+  - `mods/` 只保留 `BlackBoxPro-forge-1.20.1-*.jar`
+  - `journeymap`、`patchouli_books`、`ldlib`、`local`、`tlm_custom_pack` 等整合包侧车目录会被清掉
+  - 保留版本壳、自带 `config/defaultconfigs/resourcepacks/logs/screenshots/saves/PCL` 等最小运行内容
+- `1.20.1` 池当前默认内存：
+  - 服务端 `1G / 1G`
+  - 客户端 `1G / 1G`
+
+### 端口约定
+
+- `cell-01`：`25565 / 38080 / 38081`
+- `cell-02`：`25575 / 38090 / 38091`
+- `cell-03`：`25585 / 38100 / 38101`
+- `cell-04`：`25595 / 38110 / 38111`
+- `cell-05`：`25605 / 38120 / 38121`
+- `cell-06`：`25615 / 38130 / 38131`
+- `cell-07`：`25625 / 38140 / 38141`
+- `cell-08`：`25635 / 38150 / 38151`
+
+### 与独立主测试服的边界
+
+- `F:/minecraft/server/paper-1.12.2` 现在不属于当前测试系统的 active flow。
+- `scripts/test-cells/` 下的状态、抢占、启动、停止、插件精简脚本，都应默认只面向 `server-cell-*`。
+- `Minimize-TestCellServerPlugins.ps1` 已加保护：如果目标不在 `F:/minecraft/test-cells/server-cell-*`，脚本会直接拒绝。
+- `1.20.1` 池使用单独脚本：
+  - `Provision-TestCells1201.ps1`
+  - `Invoke-TestCell1201.ps1`
+  - `Sync-TestCell1201Artifacts.ps1`
+  - `Stop-AllTestCells1201.ps1`
+- `Get-TestCellStatus.ps1`、`Acquire-TestCell.ps1`、`Release-TestCell.ps1` 继续复用，但必须显式传 `-ConfigPath "scripts/test-cells/cells-1201.json"`。
+
 ## 测试入口总览
 
 ### 插件命令
@@ -111,6 +175,45 @@ catalog 流程最终会汇总：
 - `results[]`
 
 截图 action 仍会把文件落到默认截图目录下。
+
+## 推荐验证顺序
+
+1. `Get-TestCellStatus.ps1` 看状态。
+2. `Acquire-TestCell.ps1` 抢一个空闲 cell，避免与别的会话冲突。
+3. `Invoke-TestCell.ps1 -Mode ensure -CellId cell-0x` 拉起服务端和 bot。
+4. 先看 relay 是否通，再跑 `run_test` 或业务自动化脚本。
+5. 结束后执行 `Invoke-TestCell.ps1 -Mode stop -CellId cell-0x` 或 `Stop-AllTestCells.ps1`。
+
+## Forge 1.20.1 test-cell 流程
+
+1. `Provision-TestCells1201.ps1` 以 `G:/MC/A1.20.1/test1` 为唯一服务端模板，复制出 `server-cell-1201-06..08`。
+2. provision 后会重写：
+   - `server.properties` 的 `server-port`、`online-mode=false`、`enforce-secure-profile=false`
+   - `plugins/BlackBoxPro/config.yml` 的 `http-port`、`mod-http-address`、`test-mode=dual`
+3. 客户端 provision 会复制 `G:/MC/game/AAA枫叶大陆服务器/.minecraft/versions/1.20.1-Forge_47.3.0`，然后做精简：
+   - `mods/` 清空
+   - 删除整合包侧车目录
+   - 建立 `assets` / `libraries` junction
+4. 日常联调顺序：
+   - `.\gradlew forge1201_build`
+   - `.\gradlew plugin_build`
+   - `Sync-TestCell1201Artifacts.ps1`
+   - `Invoke-TestCell1201.ps1 -Mode ensure -CellId cell-06`
+   - 需要基础 smoke 时再执行 `Invoke-TestCell1201.ps1 -Mode smoke -CellId cell-06`
+   - `Sync-TestCell1201Artifacts.ps1` 当前只应同步正式运行 jar，不应把 `*-dev-run.jar` 或其他调试产物推进 cell
+5. `Invoke-TestCell1201.ps1 -Mode ensure` 会：
+   - 清理旧服务端 `cmd/java` 进程
+   - 起 Arclight 服务端并等待 `serverPort` 与插件 `/status`
+   - 直启 Java 17 客户端并等待 `modHttpPort`
+   - 自动执行 `connect_to_server`
+   - 若进入 `DisconnectedScreen` 且原因包含 `Server is still starting`，会先 `close_screen` 再自动重连
+   - 最终以 `query_player_state` 成功作为 ready 判定
+
+## QQFarm 闭环验证现状
+
+- `QQFarm Sprint 02` 的 `visit -> steal -> owner event` 成功分支和 breeder 拦截分支，已经在这套 test-cell 环境里通过自动化拿到 PASS 证据。
+- 推荐直接用：
+  - `powershell -ExecutionPolicy Bypass -File "F:/mcplugins/QQFarm/scripts/run-sprint-02-blackbox-qa.ps1" -Mode both -AcquireCell -CleanupCell -CellConfigPath "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/cells.json"`
 
 ## 如何理解 `docs/testing/`
 

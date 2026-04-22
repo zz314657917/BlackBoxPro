@@ -71,6 +71,7 @@ object ActionCatalog {
         register("player_abilities", "flying")
         register("resource_pack_response", "uuid", "result")
         register("screenshot", "testId", "prefix", "playerName")
+        register("screenshot_tooltip", "windowId", "slot", "testId", "prefix")
         register("connect_to_server", "ip", "port")
         register("close_screen")
         register("open_inventory")
