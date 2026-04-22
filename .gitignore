@@ -30,6 +30,10 @@ out/
 !.claude/skills
 !.claude/commands/
 !.claude/commands/**
+.claude/commands/blackboxpro-test.md
+.claude/skills/blackboxpro-test/
+.claude/skills/validate_blackboxpro_skills.py
+.agents/skills/blackboxpro-test/
 
 # OS
 .DS_Store
@@ -56,3 +60,6 @@ logs/
 META-INF/
 *.log
 *.log.gz
+blackboxpro-test-skill.zip
+skills.zip
+scripts/test-cells/locks/

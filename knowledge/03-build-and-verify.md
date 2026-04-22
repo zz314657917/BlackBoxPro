@@ -8,12 +8,12 @@
 
 ## 当前 1.12.2 验证入口
 
-- 当前 active flow 统一走 `scripts/test-cells/`，不再把 `F:/minecraft/server/paper-1.12.2` 作为默认验证入口。
-- 默认 cell 池为 `cell-01..05`，服务端目录对应 `F:/minecraft/test-cells/server-cell-01..05`。
-- 客户端目录对应 `G:/MC/game/BlackBoxProTestCells/cell-01..05/.minecraft/versions/bot`。
+- 当前 active flow 统一走 `scripts/test-cells/`，不再把独立主测试服目录作为默认验证入口。
+- 默认 cell 池为 `cell-01..05`，服务端目录命名约定为 `server-cell-01..05`。
+- 客户端目录命名约定为 `cell-01..05/.minecraft/versions/bot`。
 - 所有 test-cell 客户端当前通过 junction 共享：
-  - `G:/MC/game/AAA枫叶大陆服务器/.minecraft/assets`
-  - `G:/MC/game/AAA枫叶大陆服务器/.minecraft/libraries`
+  - `<shared_minecraft_root>/.minecraft/assets`
+  - `<shared_minecraft_root>/.minecraft/libraries`
 - 默认内存配置已收口为：
   - 服务端 `-Xms512M -Xmx1024M`
   - 客户端 `-Xms512m -Xmx1024m`
@@ -22,8 +22,8 @@
 
 - `1.20.1` test-cell 池与 `1.12.2` 分离，固定使用 `scripts/test-cells/cells-1201.json`。
 - 当前池为 `cell-06..08`：
-  - 服务端目录：`F:/minecraft/test-cells/server-cell-1201-06..08`
-  - 客户端目录：`G:/MC/game/BlackBoxProTestCells/cell-06..08/.minecraft/versions/1.20.1-Forge_47.3.0`
+  - 服务端目录命名约定：`server-cell-1201-06..08`
+  - 客户端目录命名约定：`cell-06..08/.minecraft/versions/1.20.1-Forge_47.3.0`
 - 客户端路线是“精简 mod 路线”：
   - `assets` / `libraries` 仍通过 junction 复用主整合包共享目录
   - 每个 cell 的 `mods/` 最终只保留 `BlackBoxPro-forge-1.20.1-*.jar`
@@ -31,7 +31,7 @@
 - 当前池默认内存已收口为：
   - 服务端 `-Xms1024M -Xmx1024M`
   - 客户端 `-Xms1024m -Xmx1024m`
-- Java 固定走 `G:/MC/A1.20.1/test1/jre` 下的本地 JRE 17；脚本会自动解析嵌套的 `*/bin/java.exe` 与 `javaw.exe`。
+- 仓库里提交的是脱敏样例配置；本地使用前需要先把 `cells.json` / `cells-1201.json` 改成你自己的真实路径。
 
 ## test-cell 常用命令
 
@@ -70,9 +70,9 @@
 
 ## test-cell 插件精简边界
 
-- `Minimize-TestCellServerPlugins.ps1` 默认只处理 `F:/minecraft/test-cells/server-cell-*`。
+- `Minimize-TestCellServerPlugins.ps1` 默认只处理叶子目录名符合 `server-cell-*` 的受管测试服。
 - 即使显式传 `cell-01`，只要该 cell 不在 `server-cell-*` 路径下，脚本也会直接拒绝。
-- `F:/minecraft/server/paper-1.12.2/plugins` 不属于当前 active flow；如果需要操作它，必须走显式人工决策，不应复用 test-cell 精简脚本。
+- 主测试服 `plugins/` 目录不属于当前 active flow；如果需要操作它，必须走显式人工决策，不应复用 test-cell 精简脚本。
 
 ## 根项目常用任务
 
@@ -140,8 +140,8 @@
 
 1. 构建需要的插件或 Mod 产物。
 2. 按需把产物复制到目标 cell 目录，例如：
-   - `F:/minecraft/test-cells/server-cell-01/plugins/`
-   - `G:/MC/game/BlackBoxProTestCells/cell-01/.minecraft/versions/bot/mods/`
+   - `<test_cell_server_root>/server-cell-01/plugins/`
+   - `<test_cell_workspace_root>/cell-01/.minecraft/versions/bot/mods/`
 3. 执行：
    - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode ensure -CellId cell-01`
 4. 观察：
@@ -155,7 +155,7 @@
 
 1. 使用 `QQFarm/scripts/run-sprint-02-blackbox-qa.ps1`
 2. 推荐命令：
-  - `powershell -ExecutionPolicy Bypass -File "F:/mcplugins/QQFarm/scripts/run-sprint-02-blackbox-qa.ps1" -Mode both -AcquireCell -CleanupCell -CellConfigPath "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/cells.json"`
+  - `powershell -ExecutionPolicy Bypass -File "<qqfarm_repo>/scripts/run-sprint-02-blackbox-qa.ps1" -Mode both -AcquireCell -CleanupCell -CellConfigPath "<blackboxpro_repo>/scripts/test-cells/cells.json"`
 3. 期望结果里至少看到：
    - `ok=true`
    - `fixturesRestored=true`

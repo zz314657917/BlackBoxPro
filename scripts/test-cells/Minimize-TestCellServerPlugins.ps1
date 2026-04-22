@@ -49,7 +49,8 @@ function Move-PluginIfNeeded {
 function Test-IsManagedTestCell {
     param([object]$Cell)
 
-    return $Cell.serverDir -like 'F:/minecraft/test-cells/server-cell-*'
+    $leaf = Split-Path -Leaf $Cell.serverDir
+    return $leaf -like 'server-cell-*'
 }
 
 $config = Load-TestCellConfig -ConfigPath $ConfigPath

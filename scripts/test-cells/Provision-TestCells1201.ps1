@@ -1,7 +1,8 @@
 param(
     [string]$ConfigPath = '',
-    [string]$SourceServerDir = 'G:/MC/A1.20.1/test1',
+    [string]$SourceServerDir = '',
     [string]$SourceVersionDir = '',
+    [string]$GameRoot = '',
     [string[]]$TargetCellIds = @('cell-06', 'cell-07', 'cell-08'),
     [switch]$Force
 )
@@ -87,18 +88,32 @@ function Remove-IfExists {
 }
 
 function Resolve-SourceVersionDir {
-    param([string]$ConfiguredPath)
+    param(
+        [string]$ConfiguredPath,
+        [string]$ConfiguredGameRoot
+    )
 
     if (-not [string]::IsNullOrWhiteSpace($ConfiguredPath)) {
         return $ConfiguredPath
     }
 
-    $gameRoot = 'G:/MC/game'
-    if (-not (Test-Path -LiteralPath $gameRoot)) {
-        throw "Game root not found: $gameRoot"
+    $resolvedGameRoot = if (-not [string]::IsNullOrWhiteSpace($ConfiguredGameRoot)) {
+        $ConfiguredGameRoot
+    } elseif (-not [string]::IsNullOrWhiteSpace($env:BLACKBOXPRO_TESTCELLS_GAME_ROOT)) {
+        $env:BLACKBOXPRO_TESTCELLS_GAME_ROOT
+    } else {
+        ''
     }
 
-    $candidate = Get-ChildItem -LiteralPath $gameRoot -Directory -ErrorAction SilentlyContinue |
+    if ([string]::IsNullOrWhiteSpace($resolvedGameRoot)) {
+        throw 'Source client version dir not provided. Use -SourceVersionDir or -GameRoot (or set BLACKBOXPRO_TESTCELLS_GAME_ROOT).'
+    }
+
+    if (-not (Test-Path -LiteralPath $resolvedGameRoot)) {
+        throw "Game root not found: $resolvedGameRoot"
+    }
+
+    $candidate = Get-ChildItem -LiteralPath $resolvedGameRoot -Directory -ErrorAction SilentlyContinue |
         ForEach-Object { Join-Path $_.FullName '.minecraft/versions/1.20.1-Forge_47.3.0' } |
         Where-Object { Test-Path -LiteralPath $_ } |
         Select-Object -First 1
@@ -107,7 +122,7 @@ function Resolve-SourceVersionDir {
         return $candidate
     }
 
-    throw 'Source client version dir not found under G:/MC/game/*/.minecraft/versions/1.20.1-Forge_47.3.0'
+    throw "Source client version dir not found under $resolvedGameRoot/*/.minecraft/versions/1.20.1-Forge_47.3.0"
 }
 
 function Minimize-ClientVersion {
@@ -125,10 +140,14 @@ function Minimize-ClientVersion {
 }
 
 $config = Load-TestCellConfig -ConfigPath $ConfigPath
-$SourceVersionDir = Resolve-SourceVersionDir -ConfiguredPath $SourceVersionDir
+
+if ([string]::IsNullOrWhiteSpace($SourceServerDir)) {
+    $SourceServerDir = $env:BLACKBOXPRO_TESTCELLS_1201_SERVER_TEMPLATE
+}
+$SourceVersionDir = Resolve-SourceVersionDir -ConfiguredPath $SourceVersionDir -ConfiguredGameRoot $GameRoot
 
 if (-not (Test-Path -LiteralPath $SourceServerDir)) {
-    throw "Source server dir not found: $SourceServerDir"
+    throw 'Source server dir not provided or not found. Use -SourceServerDir or set BLACKBOXPRO_TESTCELLS_1201_SERVER_TEMPLATE.'
 }
 if (-not (Test-Path -LiteralPath $SourceVersionDir)) {
     throw "Source client version dir not found: $SourceVersionDir"

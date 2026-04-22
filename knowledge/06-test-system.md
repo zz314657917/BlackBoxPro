@@ -6,33 +6,22 @@
 
 - 当前 1.12.2 本地回归统一走 `cell-01..05`。
 - 当前 Forge 1.20.1 本地回归走独立的 `cell-06..08`，配置文件固定为 `scripts/test-cells/cells-1201.json`，不混入原 `cells.json`。
-- 服务端目录：
-  - `cell-01` -> `F:/minecraft/test-cells/server-cell-01`
-  - `cell-02` -> `F:/minecraft/test-cells/server-cell-02`
-  - `cell-03` -> `F:/minecraft/test-cells/server-cell-03`
-  - `cell-04` -> `F:/minecraft/test-cells/server-cell-04`
-  - `cell-05` -> `F:/minecraft/test-cells/server-cell-05`
-  - `cell-06` -> `F:/minecraft/test-cells/server-cell-1201-06`
-  - `cell-07` -> `F:/minecraft/test-cells/server-cell-1201-07`
-  - `cell-08` -> `F:/minecraft/test-cells/server-cell-1201-08`
-- 客户端 `bot` 目录：
-  - `cell-01` -> `G:/MC/game/BlackBoxProTestCells/cell-01/.minecraft/versions/bot`
-  - `cell-02` -> `G:/MC/game/BlackBoxProTestCells/cell-02/.minecraft/versions/bot`
-  - `cell-03` -> `G:/MC/game/BlackBoxProTestCells/cell-03/.minecraft/versions/bot`
-  - `cell-04` -> `G:/MC/game/BlackBoxProTestCells/cell-04/.minecraft/versions/bot`
-  - `cell-05` -> `G:/MC/game/BlackBoxProTestCells/cell-05/.minecraft/versions/bot`
-  - `cell-06` -> `G:/MC/game/BlackBoxProTestCells/cell-06/.minecraft/versions/1.20.1-Forge_47.3.0`
-  - `cell-07` -> `G:/MC/game/BlackBoxProTestCells/cell-07/.minecraft/versions/1.20.1-Forge_47.3.0`
-  - `cell-08` -> `G:/MC/game/BlackBoxProTestCells/cell-08/.minecraft/versions/1.20.1-Forge_47.3.0`
+- 服务端目录命名约定：
+  - `cell-01..05` -> `server-cell-01..05`
+  - `cell-06..08` -> `server-cell-1201-06..08`
+- 客户端目录命名约定：
+  - `cell-01..05` -> `cell-xx/.minecraft/versions/bot`
+  - `cell-06..08` -> `cell-xx/.minecraft/versions/1.20.1-Forge_47.3.0`
+- 仓库内的 `cells.json` / `cells-1201.json` 只提交脱敏样例，真实根路径应由本地操作者自行填写。
 
 ### 客户端共享资源
 
 - 每个 cell 自己持有 `versions/bot`。
 - `1.20.1` 路线每个 cell 自己持有独立的 `versions/1.20.1-Forge_47.3.0`。
 - 但 `assets` 与 `libraries` 当前通过 junction 共享：
-  - `G:/MC/game/AAA枫叶大陆服务器/.minecraft/assets`
-  - `G:/MC/game/AAA枫叶大陆服务器/.minecraft/libraries`
-- 如果客户端启动异常，先检查 junction 是否还指向这两个共享目录。
+  - `<shared_minecraft_root>/.minecraft/assets`
+  - `<shared_minecraft_root>/.minecraft/libraries`
+- 如果客户端启动异常，先检查 junction 是否还指向本地共享资源目录。
 - `1.20.1` 路线已改成“精简 mod 客户端”：
   - `mods/` 只保留 `BlackBoxPro-forge-1.20.1-*.jar`
   - `journeymap`、`patchouli_books`、`ldlib`、`local`、`tlm_custom_pack` 等整合包侧车目录会被清掉
@@ -54,9 +43,9 @@
 
 ### 与独立主测试服的边界
 
-- `F:/minecraft/server/paper-1.12.2` 现在不属于当前测试系统的 active flow。
+- 独立主测试服目录现在不属于当前测试系统的 active flow。
 - `scripts/test-cells/` 下的状态、抢占、启动、停止、插件精简脚本，都应默认只面向 `server-cell-*`。
-- `Minimize-TestCellServerPlugins.ps1` 已加保护：如果目标不在 `F:/minecraft/test-cells/server-cell-*`，脚本会直接拒绝。
+- `Minimize-TestCellServerPlugins.ps1` 已加保护：如果目标目录叶子名不匹配 `server-cell-*`，脚本会直接拒绝。
 - `1.20.1` 池使用单独脚本：
   - `Provision-TestCells1201.ps1`
   - `Invoke-TestCell1201.ps1`
@@ -186,11 +175,11 @@ catalog 流程最终会汇总：
 
 ## Forge 1.20.1 test-cell 流程
 
-1. `Provision-TestCells1201.ps1` 以 `G:/MC/A1.20.1/test1` 为唯一服务端模板，复制出 `server-cell-1201-06..08`。
+1. `Provision-TestCells1201.ps1` 需要显式传 `-SourceServerDir`，或通过环境变量 `BLACKBOXPRO_TESTCELLS_1201_SERVER_TEMPLATE` 提供服务端模板目录。
 2. provision 后会重写：
    - `server.properties` 的 `server-port`、`online-mode=false`、`enforce-secure-profile=false`
    - `plugins/BlackBoxPro/config.yml` 的 `http-port`、`mod-http-address`、`test-mode=dual`
-3. 客户端 provision 会复制 `G:/MC/game/AAA枫叶大陆服务器/.minecraft/versions/1.20.1-Forge_47.3.0`，然后做精简：
+3. 客户端 provision 需要显式传 `-SourceVersionDir`，或通过 `-GameRoot` / `BLACKBOXPRO_TESTCELLS_GAME_ROOT` 自动发现 `1.20.1-Forge_47.3.0` 版本目录，然后做精简：
    - `mods/` 清空
    - 删除整合包侧车目录
    - 建立 `assets` / `libraries` junction
@@ -213,7 +202,7 @@ catalog 流程最终会汇总：
 
 - `QQFarm Sprint 02` 的 `visit -> steal -> owner event` 成功分支和 breeder 拦截分支，已经在这套 test-cell 环境里通过自动化拿到 PASS 证据。
 - 推荐直接用：
-  - `powershell -ExecutionPolicy Bypass -File "F:/mcplugins/QQFarm/scripts/run-sprint-02-blackbox-qa.ps1" -Mode both -AcquireCell -CleanupCell -CellConfigPath "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/cells.json"`
+  - `powershell -ExecutionPolicy Bypass -File "<qqfarm_repo>/scripts/run-sprint-02-blackbox-qa.ps1" -Mode both -AcquireCell -CleanupCell -CellConfigPath "<blackboxpro_repo>/scripts/test-cells/cells.json"`
 
 ## 如何理解 `docs/testing/`
 

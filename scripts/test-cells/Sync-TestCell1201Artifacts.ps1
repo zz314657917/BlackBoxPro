@@ -11,6 +11,8 @@ if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
 }
 . (Join-Path $PSScriptRoot 'TestCellCommon.ps1')
 
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+
 function Get-LatestArtifact {
     param(
         [string]$Directory,
@@ -38,9 +40,9 @@ $targets = if ($CellIds.Count -gt 0) {
     @($config.cells | Where-Object { $IncludeDisabled -or $_.enabled })
 }
 
-$pluginArtifact = Get-LatestArtifact -Directory 'F:/mcplugins/BlackBoxPro-dev-2.0/plugin/build/libs' -Filter 'BlackBoxPro-Plugin-*.jar'
+$pluginArtifact = Get-LatestArtifact -Directory (Join-Path $repoRoot 'plugin/build/libs') -Filter 'BlackBoxPro-Plugin-*.jar'
 $clientArtifact = Get-LatestArtifact `
-    -Directory 'F:/mcplugins/BlackBoxPro-dev-2.0/build/libs' `
+    -Directory (Join-Path $repoRoot 'build/libs') `
     -Filter 'BlackBoxPro-forge-1.20.1-*.jar' `
     -ExcludeNamePatterns @('*-dev-run.jar')
 
