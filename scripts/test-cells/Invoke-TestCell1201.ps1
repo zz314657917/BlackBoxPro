@@ -203,6 +203,7 @@ function Update-ServerConfigForCell {
         $serverContent = Set-ConfigLine -Content $serverContent -Pattern '(?m)^server-port=.*$' -Replacement "server-port=$($cell.serverPort)"
         $serverContent = Set-ConfigLine -Content $serverContent -Pattern '(?m)^online-mode=.*$' -Replacement 'online-mode=false'
         $serverContent = Set-ConfigLine -Content $serverContent -Pattern '(?m)^enforce-secure-profile=.*$' -Replacement 'enforce-secure-profile=false'
+        $serverContent = Set-ConfigLine -Content $serverContent -Pattern '(?m)^difficulty=.*$' -Replacement 'difficulty=peaceful'
         [System.IO.File]::WriteAllText($serverPropertiesPath, $serverContent, [System.Text.UTF8Encoding]::new($false))
     }
 }
@@ -218,10 +219,8 @@ function Get-ServerProcess {
 
     return Get-CimInstance Win32_Process |
         Where-Object {
-            $_.Name -eq 'java.exe' -and (
-                $_.CommandLine -match [regex]::Escape($cell.serverDir) -or
-                $_.CommandLine -match [regex]::Escape($cell.serverJar)
-            )
+            $_.Name -eq 'java.exe' -and
+            $_.CommandLine -match [regex]::Escape($cell.serverDir)
         } |
         Select-Object -First 1
 }
@@ -272,10 +271,8 @@ function Stop-CellProcesses {
     }
     foreach ($proc in @(Get-CimInstance Win32_Process |
         Where-Object {
-            $_.Name -eq 'java.exe' -and (
-                $_.CommandLine -match [regex]::Escape($cell.serverDir) -or
-                $_.CommandLine -match [regex]::Escape($cell.serverJar)
-            )
+            $_.Name -eq 'java.exe' -and
+            $_.CommandLine -match [regex]::Escape($cell.serverDir)
         })) {
         $serverJavaIds.Add([int]$proc.ProcessId) | Out-Null
     }
@@ -700,7 +697,7 @@ function Wait-ForPlayerReady {
             $null = Invoke-ModAction -Action 'close_screen' -TimeoutSec 10
             Start-Sleep -Milliseconds 800
             $null = Invoke-ModAction -Action 'connect_to_server' -Params @{
-                ip = '127.0.0.1'
+                ip = 'localhost'
                 port = $cell.serverPort
             } -TimeoutSec 30
             $lastConnectAt = Get-Date
@@ -714,7 +711,7 @@ function Wait-ForPlayerReady {
 
         if (((Get-Date) - $lastConnectAt).TotalSeconds -ge 5) {
             $null = Invoke-ModAction -Action 'connect_to_server' -Params @{
-                ip = '127.0.0.1'
+                ip = 'localhost'
                 port = $cell.serverPort
             } -TimeoutSec 30
             $lastConnectAt = Get-Date

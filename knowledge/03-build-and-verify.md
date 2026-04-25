@@ -15,7 +15,7 @@
   - `<shared_minecraft_root>/.minecraft/assets`
   - `<shared_minecraft_root>/.minecraft/libraries`
 - 默认内存配置已收口为：
-  - 服务端 `-Xms512M -Xmx1024M`
+  - 服务端 `-Xms2048M -Xmx2048M`
   - 客户端 `-Xms512m -Xmx1024m`
 
 ## 当前 1.20.1 验证入口
@@ -47,6 +47,32 @@
   - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Stop-AllTestCells.ps1"`
 - 精简 test-cell 服务端插件：
   - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Minimize-TestCellServerPlugins.ps1"`
+
+## 1.12.2 BC 测试入口
+
+- BC 代理服配置固定为 `scripts/test-cells/cells-bc.json`，本机默认目录是 `F:/minecraft/test-cells/server-cell-bc-01`。
+- BC 默认监听 `127.0.0.1:25645`，默认后端是 `cell-02`。
+- 当前 1.12.2 Forge bot 走 Waterfall 时必须保持 `forgeSupport = true`。
+- BC 代理自身内存固定为 `512M / 512M`。
+- 后端准备入口：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Prepare-TestCellBcBackends.ps1" -Mode prepare -Owner "<owner>"`
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Prepare-TestCellBcBackends.ps1" -Mode status -Owner "<owner>"`
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Prepare-TestCellBcBackends.ps1" -Mode restore -Owner "<owner>"`
+- `prepare` 默认会处理 `cell-02,cell-03`：
+  - 写入同一 owner 的 lease
+  - 保存 state 到 `scripts/test-cells/locks/bc-backend-prep/<owner>.json`
+  - 临时把后端 `spigot.yml` 改成 `bungeecord: true`
+  - 临时把后端 `plugins/BlackBoxPro/config.yml` 的 `mod-http-address` 指向 bot cell 的共享 mod 端口，例如 `http://localhost:38091`
+- `restore` 会停止目标后端进程、恢复原文、删除 state、释放本次 owner 写下的 lease，不负责重启后端。
+- 真实 BC smoke：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Run-TestCellBcSmoke.ps1"`
+  - 预期链路是 `bot -> BC:25645 -> cell-02 -> bbswitch cell-03`。
+  - smoke cleanup 会停止 BC、bot、后端，恢复配置，删除临时 helper jar 和临时后端 launcher。
+- 5 后端 BC smoke：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Run-TestCellBcSmoke.ps1" -BotCellId cell-02 -DefaultBackendId cell-02 -BackendCellIds cell-02,cell-01,cell-03,cell-04,cell-05`
+  - 已验证链路是 `cell-02 -> cell-01 -> cell-03 -> cell-04 -> cell-05`。
+  - Bot 连接 BC 必须使用 `localhost:25645`，不要使用 `127.0.0.1:25645`。
+  - 如果 smoke 被中断，先执行 `Invoke-TestCellBc.ps1 -Mode stop`，再执行 `Prepare-TestCellBcBackends.ps1 -Mode restore -Owner <owner>`，最后确认无残留 `cmd/java/javaw` 和临时 helper/launcher。
 
 ## 1.20.1 test-cell 常用命令
 
@@ -135,6 +161,8 @@
 - `cell-08`：`25635 / 38150 / 38151`
 
 ## 最短验证路径
+
+1.12.2 的 `cell-01..05` 都应保持 Germ 可用，服务端 `plugins/` 里有 `GermPlugin`，bot `mods/` 里有 `GermMod`。如发现漂移，先执行 `scripts/test-cells/Sync-TestCellBaselinePlugins.ps1 -DryRun` 查看差异，再执行同步脚本修正。
 
 ### 单个 cell
 

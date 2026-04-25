@@ -88,6 +88,9 @@ object QueryActions {
     fun queryScreenState(player: Player): CompletableFuture<ResponseMessage> =
         BlackBoxApi.sendAsync(player, "query_screen_state")
 
+    fun queryCursorState(player: Player): CompletableFuture<ResponseMessage> =
+        BlackBoxApi.sendAsync(player, "query_cursor_state")
+
     fun queryBossBar(player: Player): CompletableFuture<ResponseMessage> =
         BlackBoxApi.sendAsync(player, "query_boss_bar")
 

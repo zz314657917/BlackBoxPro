@@ -1,5 +1,6 @@
 param(
     [string]$ConfigPath = '',
+    # cell-01 is the current baseline source for provisioning managed 1.12.2 test-cells unless overridden.
     [string]$SourceCellId = 'cell-01',
     [string[]]$TargetCellIds = @('cell-02', 'cell-03', 'cell-04', 'cell-05'),
     [switch]$UseJunctionAssetsLibraries,
@@ -45,7 +46,7 @@ function Minimize-BotMods {
     }
 
     Get-ChildItem -LiteralPath $modsDir -File |
-        Where-Object { $_.Name -notlike 'BlackBoxPro-forge-1.12.2-*.jar' } |
+        Where-Object { $_.Name -notlike 'BlackBoxPro-forge-1.12.2-*.jar' -and $_.Name -notlike 'GermMod*.jar' } |
         ForEach-Object {
             Move-Item -LiteralPath $_.FullName -Destination (Join-Path $disabledDir $_.Name) -Force
         }
@@ -75,6 +76,8 @@ function Update-ServerConfig {
         $serverContent = Get-Content -Raw -LiteralPath $serverPropertiesPath
         $serverContent = [regex]::Replace($serverContent, '(?m)^server-port=\d+\s*$', "server-port=$($Cell.serverPort)")
         $serverContent = [regex]::Replace($serverContent, '(?m)^motd=.*$', "motd=BlackBoxPro $($Cell.id)")
+        $serverContent = [regex]::Replace($serverContent, '(?m)^difficulty=.*$', 'difficulty=0')
+        $serverContent = [regex]::Replace($serverContent, '(?m)^spawn-monsters=.*$', 'spawn-monsters=false')
         [System.IO.File]::WriteAllText($serverPropertiesPath, $serverContent, [System.Text.UTF8Encoding]::new($false))
     }
 }
@@ -165,6 +168,10 @@ Save-Config -ConfigObject $config
 
 [pscustomobject]@{
     sourceCellId = $sourceCell.id
+    baselineSourceCellId = $sourceCell.id
+    baselineSourceServerDir = $sourceCell.serverDir
+    baselineSourcePluginsDir = (Join-Path $sourceCell.serverDir 'plugins')
+    baselineSourceNote = 'cell-01 is the current baseline source for managed 1.12.2 test-cells unless SourceCellId is overridden.'
     provisioned = $provisioned
     configPath = $config.path
     usedJunctionAssetsLibraries = $UseJunctionAssetsLibraries.IsPresent

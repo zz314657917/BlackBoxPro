@@ -1,5 +1,6 @@
 param(
     [string]$ConfigPath = '',
+    [string]$BaselineConfigPath = '',
     [string[]]$CellIds = @(),
     [switch]$IncludeDisabled,
     [switch]$IncludeMainServer
@@ -12,25 +13,7 @@ if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
 }
 
 . (Join-Path $PSScriptRoot 'TestCellCommon.ps1')
-
-$AllowedPluginPatterns = @(
-    '^BlackBoxPro-Plugin-.*\.jar$',
-    '^QQFarm-.*\.jar$',
-    '^PlayerPoints.*\.jar$',
-    '.*Vault.*\.jar$',
-    '.*PlaceholderAPI.*\.jar$'
-)
-
-function Test-IsAllowedPlugin {
-    param([string]$Name)
-
-    foreach ($pattern in $AllowedPluginPatterns) {
-        if ($Name -imatch $pattern) {
-            return $true
-        }
-    }
-    return $false
-}
+. (Join-Path $PSScriptRoot 'TestCellBaselinePlugins.ps1')
 
 function Move-PluginIfNeeded {
     param(
@@ -54,6 +37,7 @@ function Test-IsManagedTestCell {
 }
 
 $config = Load-TestCellConfig -ConfigPath $ConfigPath
+$baseline = Load-TestCellBaselineConfig -BaselineConfigPath $BaselineConfigPath -CellConfigPath $config.path
 $targets = if ($CellIds.Count -gt 0) {
     @($CellIds | ForEach-Object { Get-TestCell -Config $config -CellId $_ })
 } else {
@@ -94,7 +78,7 @@ foreach ($cell in $targets) {
 
     $restored = New-Object System.Collections.Generic.List[string]
     Get-ChildItem -LiteralPath $disabledDir -File -Filter '*.jar' -ErrorAction SilentlyContinue |
-        Where-Object { Test-IsAllowedPlugin -Name $_.Name } |
+        Where-Object { Test-IsTestCellBaselinePlugin -Name $_.Name -BaselineConfig $baseline } |
         ForEach-Object {
             Move-PluginIfNeeded -SourcePath $_.FullName -DestinationDir $pluginsDir
             $restored.Add($_.Name) | Out-Null
@@ -104,7 +88,7 @@ foreach ($cell in $targets) {
     $moved = New-Object System.Collections.Generic.List[string]
     Get-ChildItem -LiteralPath $pluginsDir -File -Filter '*.jar' |
         ForEach-Object {
-            if (Test-IsAllowedPlugin -Name $_.Name) {
+            if (Test-IsTestCellBaselinePlugin -Name $_.Name -BaselineConfig $baseline) {
                 $kept.Add($_.Name) | Out-Null
             } else {
                 Move-PluginIfNeeded -SourcePath $_.FullName -DestinationDir $disabledDir
@@ -125,6 +109,8 @@ foreach ($cell in $targets) {
 [pscustomobject]@{
     ok = $true
     configPath = $config.path
-    allowedPatterns = $AllowedPluginPatterns
+    baselineConfigPath = $baseline.path
+    baselineId = $baseline.id
+    allowedPatterns = (Get-TestCellBaselinePluginPatterns -BaselineConfig $baseline)
     cells = $summaries.ToArray()
 } | ConvertTo-Json -Depth 12

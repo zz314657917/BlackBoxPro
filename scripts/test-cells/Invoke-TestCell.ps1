@@ -144,7 +144,7 @@ function Get-ServerProcess {
     return Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -eq 'java.exe' -and
-            $_.CommandLine -match [regex]::Escape($cell.serverJar)
+            $_.CommandLine -match [regex]::Escape($cell.serverDir)
         } |
         Select-Object -First 1
 }
@@ -160,25 +160,43 @@ function Get-ServerCmdProcesses {
 function Update-ServerConfigForCell {
     $configPath = Join-Path $cell.serverDir 'plugins/BlackBoxPro/config.yml'
     if (-not (Test-Path -LiteralPath $configPath)) {
-        return
+        $configPath = $null
     }
 
-    $pluginConfig = @(
-        '# BlackBoxPro plugin config'
-        'debug: false'
-        'response-timeout-ms: 10000'
-        "http-port: $($cell.pluginHttpPort)"
-        'test-mode: dual'
-        "mod-http-address: `"http://localhost:$($cell.modHttpPort)`""
-        ''
-    )
-    [System.IO.File]::WriteAllLines($configPath, $pluginConfig, [System.Text.UTF8Encoding]::new($false))
+    if ($null -ne $configPath) {
+        $pluginConfig = @(
+            '# BlackBoxPro plugin config'
+            'debug: false'
+            'response-timeout-ms: 10000'
+            "http-port: $($cell.pluginHttpPort)"
+            'test-mode: dual'
+            "mod-http-address: `"http://localhost:$($cell.modHttpPort)`""
+            ''
+        )
+        [System.IO.File]::WriteAllLines($configPath, $pluginConfig, [System.Text.UTF8Encoding]::new($false))
+    }
+
+    $serverPropertiesPath = Join-Path $cell.serverDir 'server.properties'
+    if (Test-Path -LiteralPath $serverPropertiesPath) {
+        $serverContent = Get-Content -Raw -LiteralPath $serverPropertiesPath
+        if ($serverContent -match '(?m)^server-port=.*$') {
+            $serverContent = [regex]::Replace($serverContent, '(?m)^server-port=.*$', "server-port=$($cell.serverPort)")
+        } else {
+            $serverContent += "`r`nserver-port=$($cell.serverPort)"
+        }
+        if ($serverContent -match '(?m)^difficulty=.*$') {
+            $serverContent = [regex]::Replace($serverContent, '(?m)^difficulty=.*$', 'difficulty=0')
+        } else {
+            $serverContent += "`r`ndifficulty=0"
+        }
+        [System.IO.File]::WriteAllText($serverPropertiesPath, $serverContent, [System.Text.UTF8Encoding]::new($false))
+    }
 }
 
 function Start-Server {
     Update-ServerConfigForCell
 
-    $inner = ('cd /d "{0}" & title BlackBoxPro-{1} & "{2}" -Xms{3}M -Xmx{4}M -XX:+UseG1GC -XX:+AggressiveOpts -XX:+UseCompressedOops -jar {5}' -f
+    $inner = ('cd /d "{0}" & title BlackBoxPro-{1} & "{2}" -Xms{3}M -Xmx{4}M -XX:+UseG1GC -XX:+AggressiveOpts -XX:+UseCompressedOops -noverify -jar {5}' -f
         $cell.serverDir,
         $cell.id,
         $cell.serverJava,
@@ -242,7 +260,7 @@ function Stop-CellProcesses {
     foreach ($proc in @(Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -eq 'java.exe' -and
-            $_.CommandLine -match [regex]::Escape($cell.serverJar)
+            $_.CommandLine -match [regex]::Escape($cell.serverDir)
         })) {
         $serverJavaIds.Add([int]$proc.ProcessId) | Out-Null
     }
@@ -428,7 +446,7 @@ function Ensure-Bot {
             id = "cell-connect-$($cell.id)-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
             action = 'connect_to_server'
             params = @{
-                ip = '127.0.0.1'
+                ip = 'localhost'
                 port = $cell.serverPort
             }
         }

@@ -267,6 +267,30 @@ object HighLevelActions {
         MouseActions.queryChatStyle(player, match, index = 0)
 
     /**
+     * 将鼠标移动到当前屏幕的 GUI 坐标。
+     */
+    fun moveMouse(player: Player, x: Double, y: Double): CompletableFuture<ResponseMessage> =
+        MouseActions.moveMouse(player, x, y)
+
+    /**
+     * 在当前鼠标位置执行一次点击。
+     */
+    fun clickMouse(player: Player, button: Int = 0, clickCount: Int = 1): CompletableFuture<ResponseMessage> =
+        MouseActions.clickMouse(player, button, clickCount)
+
+    /**
+     * 将鼠标移动到指定 GUI 坐标后执行点击。
+     */
+    fun clickScreenAt(
+        player: Player,
+        x: Double,
+        y: Double,
+        button: Int = 0,
+        clickCount: Int = 1
+    ): CompletableFuture<ResponseMessage> =
+        MouseActions.clickScreenAt(player, x, y, button, clickCount)
+
+    /**
      * 将鼠标悬停到当前容器中的指定槽位。
      */
     fun hoverSlot(player: Player, windowId: Int, slot: Int, durationTicks: Int = 0): CompletableFuture<ResponseMessage> =
@@ -277,6 +301,12 @@ object HighLevelActions {
      */
     fun querySlotTooltip(player: Player, slot: Int): CompletableFuture<ResponseMessage> =
         MouseActions.querySlotTooltip(player, slot, advanced = false)
+
+    /**
+     * 查询当前鼠标与屏幕坐标状态。
+     */
+    fun queryCursorState(player: Player): CompletableFuture<ResponseMessage> =
+        MouseActions.queryCursorState(player)
 
     /**
      * 查询当前鼠标悬浮 Tooltip 状态。

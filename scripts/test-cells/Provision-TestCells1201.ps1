@@ -1,5 +1,6 @@
 param(
     [string]$ConfigPath = '',
+    # cell-06 is the current baseline source for provisioning managed 1.20.1 test-cells unless the source dirs are overridden.
     [string]$SourceServerDir = '',
     [string]$SourceVersionDir = '',
     [string]$GameRoot = '',
@@ -204,6 +205,10 @@ foreach ($targetId in $TargetCellIds) {
 
 [pscustomobject]@{
     configPath = $config.path
+    baselineSourceCellId = 'cell-06'
+    baselineSourceServerDir = $SourceServerDir
+    baselineSourcePluginsDir = (Join-Path $SourceServerDir 'plugins')
+    baselineSourceNote = 'cell-06 is the current baseline source for managed 1.20.1 test-cells unless the source dirs are overridden.'
     sourceServerDir = $SourceServerDir
     sourceVersionDir = $SourceVersionDir
     provisioned = $provisioned

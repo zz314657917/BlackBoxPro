@@ -5,6 +5,7 @@
 ### test-cell 池
 
 - 当前 1.12.2 本地回归统一走 `cell-01..05`。
+- `cell-01..05` 都应保持 Germ 可用：服务端公共基线包含 `GermPlugin`，bot 端公共 mod 基线包含 `GermMod`；不要再把 Germ 测试限定到 `cell-04/05`。
 - 当前 Forge 1.20.1 本地回归走独立的 `cell-06..08`，配置文件固定为 `scripts/test-cells/cells-1201.json`，不混入原 `cells.json`。
 - 服务端目录命名约定：
   - `cell-01..05` -> `server-cell-01..05`
@@ -75,6 +76,41 @@
 - `run_test`
   - `scope=smoke` -> `runSmoke(...)`
   - 其他值 -> `runFull(...)`
+
+### 1.12.2 BC 手测和 smoke
+
+- BC 代理服入口：
+  - `scripts/test-cells/Invoke-TestCellBc.ps1`
+  - `scripts/test-cells/cells-bc.json`
+- BC 后端准备入口：
+  - `scripts/test-cells/Prepare-TestCellBcBackends.ps1`
+- 真实联通 smoke：
+  - `scripts/test-cells/Run-TestCellBcSmoke.ps1`
+- 默认目标：
+  - bot cell：`cell-02`
+  - backend cells：`cell-02,cell-03`
+  - BC listen：`127.0.0.1:25645`
+- `Prepare-TestCellBcBackends.ps1 -Mode prepare` 会：
+  - 校验目标 cell 可用并写入同一 owner 的 lease
+  - 保存原始 `spigot.yml` 与 `plugins/BlackBoxPro/config.yml` 到 `locks/bc-backend-prep/<owner>.json`
+  - 临时切 `bungeecord: true`
+  - 保持各 backend 自己的 `http-port`
+  - 把所有 backend 的 `mod-http-address` 指向 bot cell 的共享 mod 端口
+- `Prepare-TestCellBcBackends.ps1 -Mode restore` 会：
+  - 停止目标后端进程
+  - 恢复原文
+  - 删除 state
+  - 释放本次 owner 写下的 lease
+- `Run-TestCellBcSmoke.ps1` 当前仍使用临时 helper 插件 `bbswitch` 做跨服，因为 Waterfall 自带 `cmd_server` 模块下载链路在本机返回 `403`。
+- `Run-TestCellBcSmoke.ps1` 支持 `-BackendCellIds` 多后端 smoke；当前已验证 `cell-02 -> cell-01 -> cell-03 -> cell-04 -> cell-05`。
+- Bot 连接 BC 时使用 `localhost:25645`，不要使用 `127.0.0.1:25645`。
+- `Run-TestCellBcSmoke.ps1` 的 cleanup 必须完成：
+  - stop BC
+  - stop bot
+  - restore 后端配置
+  - release lease
+  - 删除 `TestCellBcBridgeHelper.jar`
+  - 删除临时 `start-bc-backend-*.cmd` launcher
 
 ## 两套测试流
 

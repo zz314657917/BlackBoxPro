@@ -1,0 +1,156 @@
+---
+description: BlackBoxPro local 1.12.2 regression environment conventions
+alwaysApply: false
+---
+
+# Scope
+
+Use this rule when the task is about the local BlackBoxPro 1.12.2 environment on Windows, especially:
+
+- local smoke or full regression
+- managed test-cells `cell-01..05`
+- QQFarm `visit/steal` or other real client behavior checks
+- plugin HTTP `38080/38090/...`
+- mod HTTP `38081/38091/...`
+- relay checks, screenshot evidence, or local regression cleanup
+
+If the user only wants to open or close a hand-test environment for manual clicking, prefer the manual-session workflow instead of treating it as a regression task.
+
+# Environment
+
+- Repo: `F:/mcplugins/BlackBoxPro-dev-2.0`
+- Test-cell config: `F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/cells.json`
+- Managed server dirs: `F:/minecraft/test-cells/server-cell-01..05`
+- Managed bot dirs: `G:/MC/game/BlackBoxProTestCells/cell-01..05/.minecraft/versions/bot`
+
+Baseline server plugins that should remain available in the 1.12.2 test-cell template:
+
+- `BlackBoxPro-Plugin`
+- `PlayerCurrency`
+- `Vault`
+- `PlaceholderAPI`
+- `ProtocolLib`
+
+Baseline configs are version-specific:
+
+- `scripts/test-cells/baselines/baseline-1122.json` for `cell-01..05`
+- `scripts/test-cells/baselines/baseline-1201.json` for `cell-06..08`
+
+Default ports:
+
+- `cell-01`: `25565 / 38080 / 38081`
+- `cell-02`: `25575 / 38090 / 38091`
+- `cell-03`: `25585 / 38100 / 38101`
+- `cell-04`: `25595 / 38110 / 38111`
+- `cell-05`: `25605 / 38120 / 38121`
+
+# Execution Rules
+
+- Use PowerShell syntax only.
+- Prefer the managed `scripts/test-cells/` entrypoints. Do not handcraft a custom local startup flow if the existing scripts already cover it.
+- For multi-session work, use the test-cell pool. Do not assume `cell-01` is free.
+- If the user did not explicitly specify a cell, acquire a ready test-cell first with a unique Owner and keep using the returned `cellId` for the whole session.
+- Do not mix cells inside one session. After you acquire `cell-03`, every later `status / ensure / smoke / full / stop` in that session should stay on `cell-03` until release.
+- If no cell is available, wait or report busy. Do not bypass the lease mechanism by taking a port that another session already owns.
+- Prefer the high-level regression wrapper script for real runs, so test execution and cleanup happen in one command.
+- Check status first, then acquire or choose a cell, then run `ensure`.
+- Keep the managed test-cell server in a regression-safe state: `difficulty=0` and `spawn-monsters=false`.
+- Treat hostile mob deaths as environment noise, not intended test coverage, unless the user explicitly asks for survival-pressure testing.
+- If the bot reaches a death screen or `query_player_state` reports `dead=true`, trigger `perform_respawn` automatically instead of leaving the player dead.
+- Before claiming the environment is healthy, verify fresh evidence from ports, HTTP status, or command output.
+- Before `run_test`, verify relay health with `query_player_state` through plugin HTTP.
+- Use `run_test` with `scope=smoke` for chain health and `scope=full` for broader catalog coverage.
+- Do not treat `smoke` or `full` as guaranteed zero-failure flows. Report the actual JSON result from the current run.
+
+# Preferred Commands
+
+Check the pool:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/Get-TestCellStatus.ps1"
+```
+
+Acquire a ready cell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/Acquire-TestCell.ps1" -Owner "cursor-session" -ReadyOnly
+```
+
+Preferred one-shot regression entry:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/Run-TestCellRegression.ps1" -Scope smoke -AcquireCell
+```
+
+Ensure a cell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/Invoke-TestCell.ps1" -Mode ensure -CellId <acquired-cell-id>
+```
+
+Auto respawn a dead bot when needed:
+
+```powershell
+$body = '{"id":"respawn-1","action":"perform_respawn","params":{}}'
+Invoke-WebRequest -Uri "http://127.0.0.1:38081/execute" -Method Post -ContentType "application/json; charset=utf-8" -Body $body -UseBasicParsing
+```
+
+Run smoke:
+
+```powershell
+$body = '{"id":"smoke-1","action":"run_test","params":{"player":"zzzderk","scope":"smoke"}}'
+Invoke-WebRequest -Uri "http://127.0.0.1:38080/execute" -Method Post -ContentType "application/json; charset=utf-8" -Body $body -UseBasicParsing
+```
+
+Run full:
+
+```powershell
+$body = '{"id":"full-1","action":"run_test","params":{"player":"zzzderk","scope":"full"}}'
+Invoke-WebRequest -Uri "http://127.0.0.1:38080/execute" -Method Post -ContentType "application/json; charset=utf-8" -Body $body -UseBasicParsing
+```
+
+Stop a cell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/Invoke-TestCell.ps1" -Mode stop -CellId <acquired-cell-id>
+```
+
+Release a cell lease after testing:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/Release-TestCell.ps1" -CellId <acquired-cell-id> -Owner "cursor-session"
+```
+
+# Reporting Requirements
+
+Regression summaries must include:
+
+- `cellId`
+- `passed`
+- `failed`
+- `skipped`
+- `total`
+- `totalMs`
+- whether relay succeeded
+- screenshot path when present
+- whether cleanup or stop was executed
+- whether the remaining blocker is an environment issue or a business-plugin issue
+
+# Known Local Notes
+
+- The managed regression flow now expects test-cells to be peaceful and hostile-monster-free. If an already-running cell drifts away from that state, `ensure` should bring it back to the expected config before trusting results.
+- Treat `BlackBoxPro-Plugin`, `Vault`, `PlaceholderAPI`, and `ProtocolLib` as common baseline plugins for the 1.12.2 test environment. If one is missing, fix the baseline before debugging business-plugin behavior.
+- In concurrent work, the lease is the source of truth. Acquire first, bind all later commands to that cellId, then stop and release.
+- The wrapper script should be the default for runs that should not leave client/server processes behind after testing.
+- Do not rely on the `doImmediateRespawn` gamerule here. This local stack is 1.12.2; automatic recovery should use the BlackBoxPro `perform_respawn` action.
+- `click_slot` in the 1.12.2 QQFarm friend-farm chain should use the native `windowClick(...)` path; if that flow regresses, check the deployed mod jar first.
+- If full reports failures around `click_chat_text` or `query_chat_style`, verify the test catalog targets the clickable default-channel line rather than a newer system chat line.
+- `Minimize-TestCellServerPlugins.ps1` is for `F:/minecraft/test-cells/server-cell-*` only. Do not casually apply it to `F:/minecraft/server/paper-1.12.2/plugins`.
+
+# Optional References
+
+If you need the original source material for this rule, read:
+
+- `C:/Users/Administrator/.codex/skills/blackboxpro-local-regression/SKILL.md`
+- `C:/Users/Administrator/.codex/skills/blackboxpro-local-regression/references/local-playbook.md`
+- `C:/Users/Administrator/.codex/skills/blackboxpro-local-regression/references/cross-ai-prompt-pack.md`
