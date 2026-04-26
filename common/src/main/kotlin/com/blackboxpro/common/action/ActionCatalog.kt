@@ -140,6 +140,7 @@ object ActionCatalog {
         register("query_scoreboard", "objective")
         register("query_screen_state")
         register("query_cursor_state")
+        register("query_germ_screen", "maxDepth", "maxComponents", "includeFields")
         register("query_boss_bar")
         register("query_tooltip_state", "advanced")
         register("query_chat_style", "match", "index")

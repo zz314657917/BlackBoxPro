@@ -91,6 +91,18 @@ object QueryActions {
     fun queryCursorState(player: Player): CompletableFuture<ResponseMessage> =
         BlackBoxApi.sendAsync(player, "query_cursor_state")
 
+    fun queryGermScreen(
+        player: Player,
+        maxDepth: Int = 4,
+        maxComponents: Int = 200,
+        includeFields: Boolean = false
+    ): CompletableFuture<ResponseMessage> =
+        BlackBoxApi.sendAsync(player, "query_germ_screen", JsonObject().apply {
+            addProperty("maxDepth", maxDepth)
+            addProperty("maxComponents", maxComponents)
+            addProperty("includeFields", includeFields)
+        })
+
     fun queryBossBar(player: Player): CompletableFuture<ResponseMessage> =
         BlackBoxApi.sendAsync(player, "query_boss_bar")
 
