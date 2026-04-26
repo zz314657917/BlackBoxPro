@@ -24,6 +24,12 @@
   - 新增 action 真源：`move_mouse`、`click_mouse`、`click_screen_at`、`query_cursor_state`
   - 新增 1.12.2 Forge 实现：`ScreenMouseHelper`、`MoveMouseAction`、`ClickMouseAction`、`ClickScreenAtAction`、`QueryCursorStateAction`
   - 更新 `ActionCatalog`、`ActionRegistry`、插件 API 和 `BlackBoxTestCatalog`
+- Germ 屏幕探针：
+  - 新增设计文档：`docs/superpowers/specs/2026-04-26-germ-screen-probe-design.md`
+  - 新增实现计划：`docs/superpowers/plans/2026-04-26-germ-screen-probe.md`
+  - 新增 action 真源：`query_germ_screen`
+  - 新增 1.12.2 Forge 实现：`GermScreenProbeHelper`、`QueryGermScreenAction`
+  - 更新 `ActionCatalog`、`ActionRegistry`、插件 API 和 `BlackBoxTestCatalog`
 - 1.12.2 test-cell 基线：
   - `cell-01` 作为 1.12.2 baseline source
   - `cell-01..05` 服务端插件基线包含 `GermPlugin`
@@ -50,7 +56,7 @@
 
 - 2026-04-24 曾本地执行 `./gradlew.bat forge1122_build plugin_build` 通过。
 - 2026-04-25 收尾阶段重新执行 `./gradlew.bat forge1122_build plugin_build` 通过；本机默认 Java 8 会失败，需临时指定 JDK 21，例如 `F:/mcplugins/.local-tools/temurin21/jdk-21.0.10+7`。
-- `cell-05` 部署新 `BlackBoxPro-forge-1.12.2-2.2.4.jar` 后，bot `/status` 的 action 数量从旧值提升到 `109`，说明新 action 已被运行时识别。
+- `cell-05` 部署新 `BlackBoxPro-forge-1.12.2-2.2.4.jar` 后，bot `/status` 的 action 数量提升到 `110`，说明 `query_germ_screen` 已被运行时识别。
 - `query_cursor_state` 已在 `cell-05` 真实返回：
   - Germ 界面下能读到 `screenClass`
   - 能返回 `mouseX/mouseY`
@@ -60,6 +66,10 @@
   - 点击前 `query_inventory_slot(slot=0)` 为 `minecraft:stone`
   - 调用 `click_screen_at`
   - 点击后 `query_inventory_slot(slot=0)` 变为空
+- `query_germ_screen` 已在 `cell-05` 真实返回：
+  - 非 Germ 屏幕 `GuiIngameMenu` 下返回 `supported=false`、`probeMode=reflective-fields`、组件数 `0`、warnings `0`
+  - `SkinWardrobe` 的 `/sw open` Germ 页面下返回 `screenClass=O000OOO0O0OO`、`screenClassName=com.germmc!.O000OOO0O0OO`
+  - Germ 页面下返回 `supported=true`、`probeMode=screen-class`、组件数 `5`、hovered `0`、warnings `0`
 - 2026-04-25 已确认 `cell-01..05` 都有：
   - 服务端：`GermPlugin-Snapshot-4.4.2-11.jar`
   - Bot：`GermMod-Snapshot-4.4.2-11.jar`
@@ -74,15 +84,17 @@
 
 - 在真实 Germ GUI（本轮用 `SkinWardrobe` 的 `/sw open` 验证）里，`click_screen_at` 目前尚未观察到稳定 UI 响应。
 - 这说明方案 A 已经把“通用屏幕鼠标层”做通，但 Germ 页面是否真正消费 `GuiScreen.mouseClicked(...)` 还不能下结论。
+- 方案 B 的第一步 `query_germ_screen` 已完成并通过真实 Germ 页面验证；后续应继续增强组件坐标、层级语义、hover/命中字段，而不是重新做探针入口。
 - 现代端 `1.21.11` / `1.21.1` 还没有同步新增的屏幕鼠标 action。
 - BC 多后端链路目前依赖临时 `TestCellBcBridgeHelper.jar` 的 `/bbswitch <server>`，不建议现在产品化为正式长期插件；除非后续手测也需要长期跨服切换命令。
-- 当前工作树还有大量未提交文件，下一步提交前需要按主题拆分或至少明确一次性提交边界。
+- 当前分支的 Germ 屏幕探针实现已拆成多次提交；收尾阶段只应提交本 handoff 更新。
 
 ## 当前结论
 
 - 方案 A 值得保留，第一版以 `1.12.2 Forge` 为边界是正确的。
 - 当前版本已经把 `BlackBoxPro` 从“只会点原版容器槽位”推进到“可以对任意屏幕做坐标级鼠标移动与点击”。
 - 对 Germ 自动化而言，方案 A 是必要基础层，但还不等于“Germ 所有界面立刻可点”；如果真实 Germ 页面不吃普通点击，后续需要方案 B 的专用 probe / hook。
+- 方案 B 的首个只读 probe 已落地：它能区分非 Germ 屏幕和真实 Germ screen，并能返回可用于后续组件定位的初始组件树。
 - test-cell 基础设施已经从单 cell 回归推进到：
   - `cell-01..05` 并发池
   - 1.12.2 / 1.20.1 分离
@@ -92,16 +104,11 @@
 
 ## 下一步
 
-1. 提交前复核当前工作树，建议按以下主题拆分：
-   - 屏幕鼠标 action
-   - test-cell 基线与清理脚本
-   - BC 准备/5 后端 smoke
-   - 文档、技能和 Cursor rule
-2. 继续用真实 Germ 页面做坐标夹具验证，确认是否只是坐标不准。
-3. 如果确认 Germ 页面不消费 `GuiScreen.mouseClicked(...)`，再进入方案 B：
-   - 做可选 `GermScreenProbe`
-   - 读取组件树 / hover / 命中测试
-4. 如果要长期手测 BC 跨服，再评估是否把临时 `TestCellBcBridgeHelper` 产品化；当前自动化 smoke 不需要正式 BC 插件。
+1. 提交本 handoff 更新。
+2. 后续继续增强 `query_germ_screen` 的组件坐标、可读名称、层级语义和 hover/命中字段，形成可稳定点击 Germ GUI 的夹具基础。
+3. 继续用真实 Germ 页面做坐标夹具验证，确认 `click_screen_at` 不稳定是坐标/层级问题，还是 Germ 需要专用 hook。
+4. 现代端 `1.21.11` / `1.21.1` 如需同等能力，再单独规划 action 迁移。
+5. 如果要长期手测 BC 跨服，再评估是否把临时 `TestCellBcBridgeHelper` 产品化；当前自动化 smoke 不需要正式 BC 插件。
 
 ## 验证记录
 
@@ -127,3 +134,20 @@
   - test-cell 监听端口：`0`
   - 匹配 `cmd/java/javaw` 测试进程：`0`
   - 临时 `TestCellBcBridgeHelper.jar` / `start-bc-backend-*.cmd`：`0`
+- 2026-04-27 Germ screen probe 构建：
+  - `Gradle 9.4.0 -p common --no-daemon jar`
+  - `Gradle 8.9 -p mod/1.12.2 -g .gradle-user-home/forge1122 --no-daemon --console=plain clean build`
+  - `Gradle 8.14.3 -p plugin --no-daemon build`
+  - 结果通过，仅有既有 deprecation / unchecked 警告
+- 2026-04-27 Germ screen probe 真实验证：
+  - `cell-05` ensure 成功，bot 连接 `localhost:25605`
+  - `http://127.0.0.1:38121/status` 返回 `actions=110`、`ready=true`
+  - 非 Germ 屏幕执行 `query_germ_screen` 成功，`supported=false`、组件数 `0`、warnings `0`
+  - `/sw open` 后执行 `query_cursor_state` 成功，`screenClass=O000OOO0O0OO`
+  - `/sw open` 后执行 `query_germ_screen` 成功，`supported=true`、`probeMode=screen-class`、组件数 `5`、warnings `0`
+- 2026-04-27 Germ screen probe 收尾状态：
+  - `Invoke-TestCell.ps1 -Mode stop -CellId cell-05` 成功，停止 server cmd `56128`、server java `33524`、bot javaw `12112`
+  - `Release-TestCell.ps1 -CellId cell-05 -Owner germ-screen-probe-20260427` 成功
+  - `cell-05` lease 已释放
+  - `25605/38120/38121` 监听端口：`0`
+  - 匹配 `server-cell-05` / `BlackBoxProTestCells/cell-05` 的 `cmd/java/javaw` 进程：`0`
