@@ -168,6 +168,7 @@ object ActionRegistry {
         register("query_scoreboard", QueryScoreboardAction())
         register("query_screen_state", QueryScreenStateAction())
         register("query_cursor_state", QueryCursorStateAction())
+        register("query_germ_screen", QueryGermScreenAction())
         register("query_boss_bar", QueryBossBarAction())
         register("query_tooltip_state", QueryTooltipStateAction())
         register("query_chat_style", QueryChatStyleAction())
