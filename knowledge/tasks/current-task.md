@@ -30,6 +30,13 @@
   - 新增 action 真源：`query_germ_screen`
   - 新增 1.12.2 Forge 实现：`GermScreenProbeHelper`、`QueryGermScreenAction`
   - 更新 `ActionCatalog`、`ActionRegistry`、插件 API 和 `BlackBoxTestCatalog`
+- 键盘输入 action：
+  - 新增 action 真源：`key_press`、`type_text`
+  - 新增 1.12.2 Forge 实现：`ScreenKeyboardHelper`、`KeyPressAction`、`TypeTextAction`
+  - `key_press` 在 GUI 打开时反射调用 `GuiScreen.keyTyped(...)`，无 GUI 时使用 Minecraft key binding
+  - `type_text` 面向当前 GUI 输入文本；无 GUI 时应明确失败 `No screen open`
+  - 更新插件 API：`KeyboardActions` 和 `HighLevelActions.keyPress/typeText`
+  - 更新 `BlackBoxTestCatalog` 默认参数；`type_text` 默认不纳入无夹具 full 回放
 - 1.12.2 test-cell 基线：
   - `cell-01` 作为 1.12.2 baseline source
   - `cell-01..05` 服务端插件基线包含 `GermPlugin`
@@ -57,6 +64,7 @@
 - 2026-04-24 曾本地执行 `./gradlew.bat forge1122_build plugin_build` 通过。
 - 2026-04-25 收尾阶段重新执行 `./gradlew.bat forge1122_build plugin_build` 通过；本机默认 Java 8 会失败，需临时指定 JDK 21，例如 `F:/mcplugins/.local-tools/temurin21/jdk-21.0.10+7`。
 - `cell-05` 部署新 `BlackBoxPro-forge-1.12.2-2.2.4.jar` 后，bot `/status` 的 action 数量提升到 `110`，说明 `query_germ_screen` 已被运行时识别。
+- 2026-04-27 部署新 `BlackBoxPro-forge-1.12.2-2.2.4.jar` 到 `cell-01` 后，bot `/status` 的 action 数量提升到 `112`，说明 `key_press` / `type_text` 已被运行时识别。
 - `query_cursor_state` 已在 `cell-05` 真实返回：
   - Germ 界面下能读到 `screenClass`
   - 能返回 `mouseX/mouseY`
@@ -93,6 +101,7 @@
 
 - 方案 A 值得保留，第一版以 `1.12.2 Forge` 为边界是正确的。
 - 当前版本已经把 `BlackBoxPro` 从“只会点原版容器槽位”推进到“可以对任意屏幕做坐标级鼠标移动与点击”。
+- 当前版本已补齐 1.12.2 Forge 的基础键盘输入层，可用于打开聊天/背包、关闭 GUI、向当前 GUI 输入文本。
 - 对 Germ 自动化而言，方案 A 是必要基础层，但还不等于“Germ 所有界面立刻可点”；如果真实 Germ 页面不吃普通点击，后续需要方案 B 的专用 probe / hook。
 - 方案 B 的首个只读 probe 已落地：它能区分非 Germ 屏幕和真实 Germ screen，并能返回可用于后续组件定位的初始组件树。
 - test-cell 基础设施已经从单 cell 回归推进到：
@@ -151,3 +160,16 @@
   - `cell-05` lease 已释放
   - `25605/38120/38121` 监听端口：`0`
   - 匹配 `server-cell-05` / `BlackBoxProTestCells/cell-05` 的 `cmd/java/javaw` 进程：`0`
+- 2026-04-27 keyboard actions 构建与真实验证：
+  - `gradle.bat -p common --no-daemon --console=plain test` 通过；新增 catalog 测试先红后绿
+  - `mod/1.12.2/gradlew.bat -g ../../.gradle-user-home/forge1122 --no-daemon --console=plain clean build` 通过
+  - `Gradle 8.14.3 -p plugin --no-daemon --console=plain build` 通过
+  - `cell-01` ensure 成功，bot `/status` 返回 `actions=112`、`ready=true`
+  - `type_text` 在无屏幕时返回失败 `No screen open`
+  - `key_press E` 后 `query_cursor_state` 返回 `GuiInventory`
+  - `key_press ESCAPE` 后 `query_cursor_state.open=false`
+  - `key_press T` 打开 `GuiChat`，`type_text` 输入唯一文本，`key_press RETURN` 发送后 `query_chat_history` 查到该文本
+  - `Invoke-TestCell.ps1 -Mode stop -CellId cell-01` 成功，停止 server cmd `35432`、server java `41440`、bot javaw `36652`
+  - `Release-TestCell.ps1 -CellId cell-01 -Owner keyboard-actions-20260427110619` 成功，`cell-01` lease 已释放
+  - `25565/38080/38081` 监听端口：`0`
+  - 匹配 `server-cell-01` / `BlackBoxProTestCells/cell-01` 的 `cmd/java/javaw` 进程：`0`

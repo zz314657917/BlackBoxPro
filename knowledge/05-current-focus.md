@@ -27,7 +27,7 @@
 ### 3. Action 数量的历史数字已经漂移
 
 - README 中的 action 数量是历史描述。
-- 当前 `ActionCatalog.kt` 已登记 `115` 个 action。
+- 当前 `ActionCatalog.kt` 已登记 `117` 个 action。
 - 后续涉及“支持多少 action”的描述时，应直接查 `ActionCatalog` 或运行时 `StatusHandler`。
 
 ### 4. `/actions` 路由仅有常量，没有实现

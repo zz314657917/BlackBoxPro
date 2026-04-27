@@ -3,13 +3,13 @@
 [![Build & Release](https://github.com/zz314657917/BlackBoxPro/actions/workflows/release.yml/badge.svg)](https://github.com/zz314657917/BlackBoxPro/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Minecraft 自动化黑盒测试框架。服务端插件通过 Plugin Message Channel 向客户端 Mod 下发 JSON 指令，Mod 在客户端模拟真实玩家行为（移动、交互、GUI 操作、截图、查询等），并回传结果，用于对服务端插件逻辑进行自动化功能测试。
+Minecraft 自动化黑盒测试框架。服务端插件和外部工具通过 HTTP API 向客户端 Mod 下发 JSON 指令，Mod 在客户端模拟真实玩家行为（移动、交互、GUI 操作、截图、查询等），并回传结果，用于对服务端插件逻辑进行自动化功能测试。旧版 Plugin Message Channel 相关文档仍可作为历史背景参考，当前本地验证主链以 HTTP relay 为准。
 
 ## 特性
 
-- 112 个 Action（1.21.x），105 个 Action（1.12.2），覆盖 Minecraft 全部 Serverbound 协议包 + 查询 + 复合行为
+- Action 真源由 `common/src/main/kotlin/com/blackboxpro/common/action/ActionCatalog.kt` 维护，当前登记 117 个 Action；各 Loader 的实际支持以对应 `ActionRegistry` 为准
 - 五端同步支持：Fabric 1.21.11 / NeoForge 1.21.11 / Fabric 1.21.1 / NeoForge 1.21.1 / Forge 1.12.2
-- 双通道通讯：Plugin Message Channel（服务端→客户端）+ HTTP API（外部工具直连 Mod）
+- HTTP relay 通讯：服务端插件和外部工具都可通过 `/execute` 调用客户端 Mod
 - 物理引擎驱动的移动系统（InjectedInput），支持碰撞检测与 A* 寻路
 - 截图系统：普通截图 + Tooltip 渲染截图（`screenshot_tooltip`），支持帧缓冲捕获
 - 完整的查询系统：玩家状态、方块、世界、容器、记分板、Boss Bar、聊天历史等 17 种查询
@@ -18,11 +18,11 @@ Minecraft 自动化黑盒测试框架。服务端插件通过 Plugin Message Cha
 ## 架构
 
 ```text
-┌─────────────────────┐     blackbox:command      ┌──────────────────────┐
+┌─────────────────────┐       HTTP /execute       ┌──────────────────────┐
 │   Bukkit Server     │ ────────────────────────▶ │  Fabric / NeoForge   │
 │   (plugin 模块)     │                           │  / Forge 客户端 Mod  │
 │                     │ ◀──────────────────────── │                      │
-│                     │     blackbox:response     │                      │
+│                     │       HTTP response       │                      │
 └─────────────────────┘                           └──────────────────────┘
 
 外部工具 ──── HTTP POST ────▶ Mod (:38081) 或 Plugin (:38080)
@@ -79,27 +79,27 @@ BlackBoxPro/
 
 ## 支持的行为
 
-1.21.x 端共 112 个 Action，1.12.2 端共 105 个（为最大兼容子集）。
+Action ID 与参数以 `common/src/main/kotlin/com/blackboxpro/common/action/ActionCatalog.kt` 为真源，当前登记 117 个 Action。各 Loader 的实际支持以对应 `ActionRegistry` 为准；本地已验证的 Forge 1.12.2 运行时 `/status` 当前返回 `actions=112`。
 
-| 分类 | 示例 | 1.21.x | 1.12.2 |
-|------|------|:------:|:------:|
-| 移动与位置 | `player_move`, `player_look`, `navigate_to` | 8 | 8 |
-| 方块交互 | `dig_start`, `place_block`, `use_item` | 5 | 5 |
-| 实体交互 | `attack_entity`, `interact_entity`, `left_click` | 5 | 5 |
-| 容器 / GUI | `click_slot`, `hover_slot`, `close_container` | 11 | 7 |
-| 玩家状态 | `sneak_start`, `drop_item`, `jump`, `elytra_start` | 15 | 16 |
-| 聊天命令 | `chat_message`, `chat_command`, `click_chat_text` | 3 | 3 |
-| 客户端设置 | `screenshot`, `screenshot_tooltip`, `connect_to_server` | 10 | 11 |
-| 进阶交互 | `edit_book`, `update_sign`, `select_trade` | 17 | 14 |
-| 调试 | `keep_alive`, `pong`, `custom_payload` | 6 | 3 |
-| 复合行为 | `pathfind_to`, `break_block`, `batch`, `craft_recipe` | 15 | 16 |
-| 查询 | `query_player_state`, `query_container_slots`, `query_tooltip_state` | 17 | 17 |
+| 分类 | 示例 |
+|------|------|
+| 移动与位置 | `player_move`, `player_look`, `navigate_to` |
+| 方块交互 | `dig_start`, `place_block`, `use_item` |
+| 实体交互 | `attack_entity`, `interact_entity`, `left_click` |
+| 容器 / GUI | `click_slot`, `hover_slot`, `close_container` |
+| 玩家状态 | `sneak_start`, `drop_item`, `jump`, `elytra_start` |
+| 聊天命令 | `chat_message`, `chat_command`, `click_chat_text` |
+| 客户端输入 / 设置 | `screenshot`, `screenshot_tooltip`, `connect_to_server`, `key_press`, `type_text` |
+| 进阶交互 | `edit_book`, `update_sign`, `select_trade` |
+| 调试 | `keep_alive`, `pong`, `custom_payload` |
+| 复合行为 | `pathfind_to`, `break_block`, `batch`, `craft_recipe` |
+| 查询 | `query_player_state`, `query_container_slots`, `query_tooltip_state` |
 
 ## 通讯协议
 
-### Plugin Message Channel
+### 历史 Plugin Message Channel
 
-消息格式：JSON over Plugin Message Channel（VarInt length + UTF-8 bytes）。
+旧版设计使用 JSON over Plugin Message Channel（VarInt length + UTF-8 bytes）。当前本地验证和插件 API 主链路以 HTTP `/execute` relay 为准；这一节保留为协议背景。
 
 指令（Server → Client）：
 ```json
@@ -138,6 +138,30 @@ curl -s -X POST http://localhost:38081/execute \
 
 # 服务状态检查
 curl -sf http://localhost:38081/status
+```
+
+### Forge 1.12.2 键盘输入动作
+
+`key_press` 和 `type_text` 在 Forge 1.12.2 客户端内部执行，不依赖 Windows 全局键盘注入。
+
+- `key_press`：GUI 打开时反射调用当前 `GuiScreen.keyTyped(...)`；无 GUI 时使用 Minecraft `KeyBinding`，可用于 `E` 打开背包、`T` 打开聊天、`ESCAPE` 关闭界面等。
+- `type_text`：向当前打开的 GUI 输入文本；如果没有打开屏幕，会返回 `No screen open`。
+
+```bash
+# 打开聊天
+curl -s -X POST http://localhost:38081/execute \
+  -H "Content-Type: application/json" \
+  -d '{"id":"open-chat","action":"key_press","params":{"key":"T","pressTicks":1}}'
+
+# 向当前聊天框输入文本
+curl -s -X POST http://localhost:38081/execute \
+  -H "Content-Type: application/json" \
+  -d '{"id":"type-chat","action":"type_text","params":{"text":"hello from BlackBoxPro","intervalTicks":0}}'
+
+# 回车发送
+curl -s -X POST http://localhost:38081/execute \
+  -H "Content-Type: application/json" \
+  -d '{"id":"send-chat","action":"key_press","params":{"key":"RETURN","pressTicks":1}}'
 ```
 
 ## 构建

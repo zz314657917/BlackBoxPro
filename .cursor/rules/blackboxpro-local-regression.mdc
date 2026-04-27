@@ -61,6 +61,8 @@ Default ports:
 - Before `run_test`, verify relay health with `query_player_state` through plugin HTTP.
 - Use `run_test` with `scope=smoke` for chain health and `scope=full` for broader catalog coverage.
 - Do not treat `smoke` or `full` as guaranteed zero-failure flows. Report the actual JSON result from the current run.
+- For GUI typing or hotkey checks, use the mod actions `key_press` and `type_text`; do not inject Windows-global keyboard input into the desktop session.
+- `type_text` requires an open client screen with a text input target. If no screen is open, the expected result is a clear `No screen open` failure.
 
 # Preferred Commands
 

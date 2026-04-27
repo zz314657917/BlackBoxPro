@@ -53,6 +53,7 @@ object BlackBoxTestCatalog {
         "move_mouse",
         "click_mouse",
         "click_screen_at",
+        "type_text",
         "leave_bed",
         "horse_jump_start",
         "horse_jump_stop",
@@ -488,6 +489,14 @@ object BlackBoxTestCatalog {
             addProperty("button", 0)
             addProperty("clickCount", 1)
         }
+        "key_press" -> JsonObject().apply {
+            addProperty("key", "ESCAPE")
+            addProperty("pressTicks", 1)
+        }
+        "type_text" -> JsonObject().apply {
+            addProperty("text", "BlackBoxPro")
+            addProperty("intervalTicks", 0)
+        }
         "close_screen" -> JsonObject()
         "create_world" -> JsonObject().apply {
             addProperty("worldName", "blackbox_test_world")
@@ -633,7 +642,7 @@ object BlackBoxTestCatalog {
         actionId.startsWith("query_") -> "query"
         actionId in setOf("look_at", "look_at_entity", "look_at_block", "pathfind_to", "navigate_to", "break_block", "place_block_at", "attack", "use", "open_container", "container_transfer", "drop_inventory", "wait", "batch", "respawn", "craft_recipe") -> "composite"
         actionId in setOf("chat_message", "chat_command") -> "chat"
-        actionId in setOf("client_information", "player_abilities", "resource_pack_response", "screenshot", "move_mouse", "click_mouse", "click_screen_at", "connect_to_server", "close_screen", "create_world", "join_world", "leave_world") -> "client"
+        actionId in setOf("client_information", "player_abilities", "resource_pack_response", "screenshot", "move_mouse", "click_mouse", "click_screen_at", "key_press", "type_text", "connect_to_server", "close_screen", "create_world", "join_world", "leave_world") -> "client"
         actionId in setOf("custom_payload", "tab_complete", "keep_alive", "pong", "debug_sample_subscription", "chunk_batch_received") -> "debug"
         actionId in setOf("player_move", "player_move_look", "player_look", "player_on_ground", "confirm_teleportation", "move_vehicle", "paddle_boat", "player_input") -> "movement"
         actionId in setOf("dig_start", "dig_cancel", "dig_finish", "place_block", "use_item") -> "block"

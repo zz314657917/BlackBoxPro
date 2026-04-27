@@ -134,3 +134,11 @@
   - `index`
 - 文件目录结构默认是：
   `screenshots/blackboxpro/<playerName>/<testId>/`
+
+## Forge 1.12.2 键盘输入动作
+
+- `key_press` 和 `type_text` 是客户端内部输入动作，不通过 Windows 全局键盘事件模拟。
+- `key_press` 在有 GUI 时调用当前 `GuiScreen.keyTyped(...)` / `func_73869_a(...)`；无 GUI 时通过 `KeyBinding.setKeyBindState(...)` + `KeyBinding.onTick(...)` 触发游戏热键。
+- `type_text` 逐字符调用当前 GUI 的 key handler，适合聊天框、搜索框、配置输入框等文本目标。
+- `type_text` 要求当前有打开的屏幕；无屏幕时应返回 `No screen open`，避免误以为已经输入到游戏世界。
+- 2026-04-27 已在 Forge 1.12.2 `cell-01` 验证：`key_press E` 打开 `GuiInventory`，`key_press ESCAPE` 关闭 GUI，`key_press T` 打开 `GuiChat` 后 `type_text` + `RETURN` 能发送并被 `query_chat_history` 查到。

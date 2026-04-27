@@ -315,6 +315,24 @@ object HighLevelActions {
         MouseActions.queryTooltipState(player)
 
     /**
+     * 在客户端按下一个按键。GUI 打开时走当前屏幕的 keyTyped；无 GUI 时走 MC key binding。
+     */
+    fun keyPress(
+        player: Player,
+        key: String? = null,
+        keyCode: Int? = null,
+        char: Char? = null,
+        pressTicks: Int = 1
+    ): CompletableFuture<ResponseMessage> =
+        KeyboardActions.keyPress(player, key, keyCode, char, pressTicks)
+
+    /**
+     * 向当前客户端 GUI 输入文本。
+     */
+    fun typeText(player: Player, text: String, intervalTicks: Int = 0): CompletableFuture<ResponseMessage> =
+        KeyboardActions.typeText(player, text, intervalTicks)
+
+    /**
      * 先查样式，若存在 ClickEvent 再执行点击。
      */
     fun queryAndClickChatText(player: Player, match: String): CompletableFuture<ResponseMessage> =

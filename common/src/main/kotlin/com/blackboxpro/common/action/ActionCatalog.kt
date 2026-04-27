@@ -75,6 +75,8 @@ object ActionCatalog {
         register("move_mouse", "x", "y")
         register("click_mouse", "button", "clickCount")
         register("click_screen_at", "x", "y", "button", "clickCount")
+        register("key_press", "key", "keyCode", "char", "pressTicks")
+        register("type_text", "text", "intervalTicks")
         register("connect_to_server", "ip", "port")
         register("close_screen")
         register("open_inventory")
