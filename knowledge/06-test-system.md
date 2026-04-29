@@ -33,7 +33,7 @@
 
 ### 端口约定
 
-- `cell-01`：`25565 / 38080 / 38081`
+- `cell-01`：`25570 / 38080 / 38081`
 - `cell-02`：`25575 / 38090 / 38091`
 - `cell-03`：`25585 / 38100 / 38101`
 - `cell-04`：`25595 / 38110 / 38111`
@@ -76,6 +76,22 @@
 - `run_test`
   - `scope=smoke` -> `runSmoke(...)`
   - 其他值 -> `runFull(...)`
+
+### Germ 屏幕探针与 hit-test
+
+- `query_germ_screen` 是只读组件树探针，适合 GUI/PAPI/测试脚本读取当前 Germ screen 状态，不触发点击。
+- `query_germ_hit_test` 是只读命中探针，参数为 `x`、`y`、`maxDepth`、`maxComponents`、`includeFields`。
+- `includeFields=true` 时会返回 `numericHints`、`boundsCandidates`、`boundsSource`、`hitSource`，用于分析 Germ 混淆字段中的坐标、尺寸和命中来源。
+- 隐藏 1.12.2 bot 做真实 Germ 页验证时，先确认 `versions/bot/options.txt` 中 `pauseOnLostFocus:false`，否则客户端可能自动回到 `GuiIngameMenu`，导致 `/gp open ...` 后看起来没有打开 Germ GUI。
+- 2026-04-29 已在 `cell-01` 的 `germ_gui_loading` 验证：
+  - texture 点 `185,96` 命中 bounds `182.0,92.5,16.0,16.0`
+  - text 点 `210,100` / `238,100` 命中 bounds `202.0,96.5,100.0,12.0`
+  - gif 点 `246,100` 命中 bounds `242.0,96.5,10.0,10.0`
+  - outside 点 `300,140` 返回 `hitCount=0`
+  - 非 Germ `GuiIngameMenu` 返回 `supported=false`、组件数 `0`、`hitCount=0`
+  - 同轮 `run_test scope=smoke` 返回 `passed=22 failed=0 skipped=0 total=22 totalMs=8052`
+- 若某个 cell 的 `/gp open ...` 返回聊天提示 `GermPlugin 的Cdk不是正确的，导致验证失败`，把它记录为该 cell 的 Germ 环境 blocker，换空闲 cell 复测，不要归因到 hit-test action。
+- 当前仍不提供 `click_germ_component`；专用 Germ 点击动作必须等真实业务页面 bounds 稳定后单独设计和验收。
 
 ### 1.12.2 BC 手测和 smoke
 

@@ -9,6 +9,7 @@
   - `1.12.2` 仍用 `cell-01..05`
   - Forge `1.20.1` 独立用 `cell-06..08` + `cells-1201.json` + 专用 `Invoke/Provision/Sync/Stop` 脚本
 - Forge `1.20.1` 客户端路线已经切到“精简 mod”模式，默认只保留 `BlackBoxPro` 客户端模组，不再沿用整合包第三方 mod 列表。
+- 1.12.2 Forge 的 Germ 只读探针已推进到 `query_germ_hit_test`：当前能在真实 `germ_gui_loading` 页面返回 texture、text、gif 的候选 bounds 和 hit 结果，但还没有专用点击动作。
 
 ## 已确认的现状差异
 
@@ -57,3 +58,4 @@
 - 改 action 时，默认先同步 `1.21.11`，再判断 `1.21.1` 和 `1.12.2` 是否需要跟进。
 - 改测试时，优先看 `BlackBoxTestCatalog.kt` 和 `BlackBoxTestRunner.kt`，再参考 `docs/testing/`。
 - 改构建说明时，以 `build.gradle.kts` 和各模块 `build.gradle.kts` 为准，不直接抄 README。
+- 做 Germ 点击验收时，先用 `query_germ_hit_test` 采样真实业务页面 bounds；隐藏 1.12.2 bot 需要先确保 `pauseOnLostFocus:false`，否则会自动回到 `GuiIngameMenu`；只有 bounds 稳定后再设计显式点击 hook，不要把副作用放进 query action。

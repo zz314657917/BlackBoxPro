@@ -171,6 +171,7 @@ object ActionRegistry {
         register("query_screen_state", QueryScreenStateAction())
         register("query_cursor_state", QueryCursorStateAction())
         register("query_germ_screen", QueryGermScreenAction())
+        register("query_germ_hit_test", QueryGermHitTestAction())
         register("query_boss_bar", QueryBossBarAction())
         register("query_tooltip_state", QueryTooltipStateAction())
         register("query_chat_style", QueryChatStyleAction())

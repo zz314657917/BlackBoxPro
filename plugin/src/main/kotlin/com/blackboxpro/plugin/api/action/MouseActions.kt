@@ -91,6 +91,16 @@ object MouseActions {
     ): CompletableFuture<ResponseMessage> =
         QueryActions.queryGermScreen(player, maxDepth, maxComponents, includeFields)
 
+    fun queryGermHitTest(
+        player: Player,
+        x: Double? = null,
+        y: Double? = null,
+        maxDepth: Int = 4,
+        maxComponents: Int = 200,
+        includeFields: Boolean = false
+    ): CompletableFuture<ResponseMessage> =
+        QueryActions.queryGermHitTest(player, x, y, maxDepth, maxComponents, includeFields)
+
     fun queryTooltipState(player: Player): CompletableFuture<ResponseMessage> =
         QueryActions.queryTooltipState(player)
 }

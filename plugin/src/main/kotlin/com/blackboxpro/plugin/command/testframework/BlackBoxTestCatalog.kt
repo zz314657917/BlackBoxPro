@@ -50,6 +50,7 @@ object BlackBoxTestCatalog {
         "query_slot_tooltip",
         "query_tooltip_state",
         "query_germ_screen",
+        "query_germ_hit_test",
         "move_mouse",
         "click_mouse",
         "click_screen_at",
@@ -373,7 +374,7 @@ object BlackBoxTestCatalog {
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("该 action 用于启动前连接流程，不纳入 run_test 全量回放"))
             "close_screen" ->
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("需要显式打开 GUI；当前 run_test 默认场景不覆盖"))
-            "query_germ_screen" ->
+            "query_germ_screen", "query_germ_hit_test" ->
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("需要先打开真实 Germ GUI；当前 run_test 默认场景只验证 action 可注册"))
             "create_world", "join_world", "leave_world" ->
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("该 action 属于客户端会话管理，当前 run_test 服务端联调链路不覆盖"))
@@ -409,6 +410,7 @@ object BlackBoxTestCatalog {
             "query_screen_state",
             "query_cursor_state",
             "query_germ_screen",
+            "query_germ_hit_test",
             "query_boss_bar" -> if (data != null && data.size() > 0) null else "查询响应没有返回数据"
             else -> null
         }
@@ -550,6 +552,13 @@ object BlackBoxTestCatalog {
             addProperty("maxDepth", 4)
             addProperty("maxComponents", 200)
             addProperty("includeFields", false)
+        }
+        "query_germ_hit_test" -> JsonObject().apply {
+            addProperty("x", 320.0)
+            addProperty("y", 180.0)
+            addProperty("maxDepth", 4)
+            addProperty("maxComponents", 200)
+            addProperty("includeFields", true)
         }
         "query_slot_tooltip" -> JsonObject().apply { addProperty("slot", 0) }
         "screenshot" -> JsonObject().apply {

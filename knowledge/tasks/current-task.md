@@ -30,6 +30,11 @@
   - 新增 action 真源：`query_germ_screen`
   - 新增 1.12.2 Forge 实现：`GermScreenProbeHelper`、`QueryGermScreenAction`
   - 更新 `ActionCatalog`、`ActionRegistry`、插件 API 和 `BlackBoxTestCatalog`
+- Germ hit-test 只读探针：
+  - 新增 action 真源：`query_germ_hit_test`
+  - 新增 1.12.2 Forge 实现：`QueryGermHitTestAction`
+  - `GermScreenProbeHelper` 现在返回 `numericHints`、`boundsCandidates`、`boundsSource`、`hitSource`，用于定位混淆 Germ 组件坐标
+  - 已支持 `germ_gui_loading` 的 texture、text、gif 可见元素命中；仍不提供 `click_germ_component` 这类副作用动作
 - 键盘输入 action：
   - 新增 action 真源：`key_press`、`type_text`
   - 新增 1.12.2 Forge 实现：`ScreenKeyboardHelper`、`KeyPressAction`、`TypeTextAction`
@@ -78,6 +83,18 @@
   - 非 Germ 屏幕 `GuiIngameMenu` 下返回 `supported=false`、`probeMode=reflective-fields`、组件数 `0`、warnings `0`
   - `SkinWardrobe` 的 `/sw open` Germ 页面下返回 `screenClass=O000OOO0O0OO`、`screenClassName=com.germmc!.O000OOO0O0OO`
   - Germ 页面下返回 `supported=true`、`probeMode=screen-class`、组件数 `5`、hovered `0`、warnings `0`
+- `query_germ_hit_test` 已在 `cell-01` 的真实 Germ loading GUI 返回可用命中：
+  - `/gp open zzzderk germ_gui_loading` 后，`x=185,y=96` 命中 texture，bounds `182.0,92.5,16.0,16.0`
+  - `x=210,y=100` 与 `x=238,y=100` 命中文本，bounds `202.0,96.5,100.0,12.0`
+  - `x=246,y=100` 命中 gif，bounds `242.0,96.5,10.0,10.0`
+  - `x=300,y=140` 返回 `hitCount=0`
+  - 非 Germ `GuiIngameMenu` 下仍返回 `supported=false`、组件数 `0`、`hitCount=0`
+- 2026-04-29 收口复测确认：
+  - `cell-03` 的 Germ 真 GUI 打开被 `GermPlugin 的Cdk不是正确的，导致验证失败` 阻塞，不能作为 Germ hit-test 失败结论。
+  - 隐藏 1.12.2 bot 若 `pauseOnLostFocus:true`，会反复回到 `GuiIngameMenu`；Germ 真页验证前应临时设为 `pauseOnLostFocus:false` 并重启 cell。
+  - 换到 `cell-01` 同步当前分支 `BlackBoxPro-Plugin-2.2.4.jar` 与 `BlackBoxPro-forge-1.12.2-2.2.4.jar` 后，relay `query_player_state` 成功，`/status` 返回 `actions=113 ready=true`。
+  - `run_test scope=smoke` 通过：`passed=22 failed=0 skipped=0 total=22 totalMs=8052`。
+  - `query_germ_hit_test` 精简复测：texture/text/gif 均 `containsHit=true` 且返回 `boundsSource` / `hitSource`，outside 点 `hitCount=0`。
 - 2026-04-25 已确认 `cell-01..05` 都有：
   - 服务端：`GermPlugin-Snapshot-4.4.2-11.jar`
   - Bot：`GermMod-Snapshot-4.4.2-11.jar`
@@ -92,7 +109,7 @@
 
 - 在真实 Germ GUI（本轮用 `SkinWardrobe` 的 `/sw open` 验证）里，`click_screen_at` 目前尚未观察到稳定 UI 响应。
 - 这说明方案 A 已经把“通用屏幕鼠标层”做通，但 Germ 页面是否真正消费 `GuiScreen.mouseClicked(...)` 还不能下结论。
-- 方案 B 的第一步 `query_germ_screen` 已完成并通过真实 Germ 页面验证；后续应继续增强组件坐标、层级语义、hover/命中字段，而不是重新做探针入口。
+- 方案 B 的只读探针已推进到 `query_germ_hit_test`：能返回真实 Germ loading 页面可见元素的候选 bounds 和 hit 结果；下一步才适合基于这些 bounds 评估专用 Germ 点击动作。
 - 现代端 `1.21.11` / `1.21.1` 还没有同步新增的屏幕鼠标 action。
 - BC 多后端链路目前依赖临时 `TestCellBcBridgeHelper.jar` 的 `/bbswitch <server>`，不建议现在产品化为正式长期插件；除非后续手测也需要长期跨服切换命令。
 - 当前分支的 Germ 屏幕探针实现已拆成多次提交；收尾阶段只应提交本 handoff 更新。
@@ -103,7 +120,7 @@
 - 当前版本已经把 `BlackBoxPro` 从“只会点原版容器槽位”推进到“可以对任意屏幕做坐标级鼠标移动与点击”。
 - 当前版本已补齐 1.12.2 Forge 的基础键盘输入层，可用于打开聊天/背包、关闭 GUI、向当前 GUI 输入文本。
 - 对 Germ 自动化而言，方案 A 是必要基础层，但还不等于“Germ 所有界面立刻可点”；如果真实 Germ 页面不吃普通点击，后续需要方案 B 的专用 probe / hook。
-- 方案 B 的首个只读 probe 已落地：它能区分非 Germ 屏幕和真实 Germ screen，并能返回可用于后续组件定位的初始组件树。
+- 方案 B 的只读 probe 已落地到 hit-test 层：它能区分非 Germ 屏幕和真实 Germ screen，并能返回可用于后续组件定位的候选 bounds 与命中结果。
 - test-cell 基础设施已经从单 cell 回归推进到：
   - `cell-01..05` 并发池
   - 1.12.2 / 1.20.1 分离
@@ -113,8 +130,8 @@
 
 ## 下一步
 
-1. 提交本 handoff 更新。
-2. 后续继续增强 `query_germ_screen` 的组件坐标、可读名称、层级语义和 hover/命中字段，形成可稳定点击 Germ GUI 的夹具基础。
+1. 基于 `query_germ_hit_test` 在 Lmshop 的真实 Germ 商城页上找购买按钮/商品组件 bounds，先补只读证据。
+2. 如 bounds 稳定，再单独设计显式 `click_germ_component` 或专用 hook；不要把点击副作用塞进 query action。
 3. 继续用真实 Germ 页面做坐标夹具验证，确认 `click_screen_at` 不稳定是坐标/层级问题，还是 Germ 需要专用 hook。
 4. 现代端 `1.21.11` / `1.21.1` 如需同等能力，再单独规划 action 迁移。
 5. 如果要长期手测 BC 跨服，再评估是否把临时 `TestCellBcBridgeHelper` 产品化；当前自动化 smoke 不需要正式 BC 插件。
@@ -173,3 +190,10 @@
   - `Release-TestCell.ps1 -CellId cell-01 -Owner keyboard-actions-20260427110619` 成功，`cell-01` lease 已释放
   - `25565/38080/38081` 监听端口：`0`
   - 匹配 `server-cell-01` / `BlackBoxProTestCells/cell-01` 的 `cmd/java/javaw` 进程：`0`
+- 2026-04-29 Germ hit-test 构建与真实验证：
+  - `./gradlew.bat -p common --no-daemon --console=plain test --rerun-tasks "-Pkotlin.incremental=false"` 通过
+  - `./gradlew.bat forge1122_build --no-daemon --console=plain` 通过
+  - `F:/mcplugins/.local-tools/gradle/gradle-8.14.3/bin/gradle.bat -p plugin --no-daemon --console=plain build` 通过
+  - `cell-01` 部署新 `BlackBoxPro-forge-1.12.2-2.2.4.jar` 后，`http://127.0.0.1:38081/status` 返回 `actions=113`、`ready=true`
+  - `/gp open zzzderk germ_gui_loading` 后，`query_germ_hit_test` 对 texture、text、gif 可见点返回 `hitCount>=1` 和可用 bounds；非 Germ `GuiIngameMenu` 返回 `supported=false`、`hitCount=0`
+  - 收口复测中 `run_test scope=smoke` 返回 `passed=22 failed=0 skipped=0 total=22 totalMs=8052`
