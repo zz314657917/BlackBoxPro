@@ -27,6 +27,9 @@ Baseline server plugins that should remain available in the 1.12.2 test-cell tem
 
 - `BlackBoxPro-Plugin`
 - `PlayerCurrency`
+- `PlayerPoints`
+- `LuckPerms`
+- `GermPlugin`
 - `Vault`
 - `PlaceholderAPI`
 - `ProtocolLib`
@@ -34,11 +37,12 @@ Baseline server plugins that should remain available in the 1.12.2 test-cell tem
 Baseline configs are version-specific:
 
 - `scripts/test-cells/baselines/baseline-1122.json` for `cell-01..05`
-- `scripts/test-cells/baselines/baseline-1201.json` for `cell-06..08`
+- `scripts/test-cells/baselines/baseline-1201.json` for `cell-06..08`; baseline server plugins are `BlackBoxPro-Plugin`, `PlayerCurrency`, and `LuckPerms`
 
 Default ports:
 
-- `cell-01`: `25565 / 38080 / 38081`
+- Managed test server ports must be unique and must not use `25565` or `25566`.
+- `cell-01`: `25570 / 38080 / 38081`
 - `cell-02`: `25575 / 38090 / 38091`
 - `cell-03`: `25585 / 38100 / 38101`
 - `cell-04`: `25595 / 38110 / 38111`
@@ -87,6 +91,14 @@ Ensure a cell:
 ```powershell
 powershell -ExecutionPolicy Bypass -File "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/Invoke-TestCell.ps1" -Mode ensure -CellId <acquired-cell-id>
 ```
+
+Double-click manual launcher:
+
+```powershell
+G:/MC/game/BlackBoxProTestCells/cell-XX/Start-ManualTest.cmd
+```
+
+Use this only for human hand-testing from Windows Explorer. It acquires the pinned cell, starts the server and a visible client, waits for Enter, then stops the matching server/client and releases the lease. Current launchers exist for `cell-01..08`, isolated `cell-10`, and `cell-20..22`.
 
 Auto respawn a dead bot when needed:
 
@@ -139,10 +151,11 @@ Regression summaries must include:
 # Known Local Notes
 
 - The managed regression flow now expects test-cells to be peaceful and hostile-monster-free. If an already-running cell drifts away from that state, `ensure` should bring it back to the expected config before trusting results.
-- Treat `BlackBoxPro-Plugin`, `Vault`, `PlaceholderAPI`, and `ProtocolLib` as common baseline plugins for the 1.12.2 test environment. If one is missing, fix the baseline before debugging business-plugin behavior.
+- Treat `BlackBoxPro-Plugin`, `PlayerCurrency`, `PlayerPoints`, `LuckPerms`, `GermPlugin`, `Vault`, `PlaceholderAPI`, and `ProtocolLib` as common baseline plugins for the 1.12.2 test environment. If one is missing, fix the baseline before debugging business-plugin behavior.
 - In concurrent work, the lease is the source of truth. Acquire first, bind all later commands to that cellId, then stop and release.
 - The wrapper script should be the default for runs that should not leave client/server processes behind after testing.
 - Do not rely on the `doImmediateRespawn` gamerule here. This local stack is 1.12.2; automatic recovery should use the BlackBoxPro `perform_respawn` action.
+- Keep 1.12.2 test servers superflat with `level-type=FLAT` and empty `generator-settings`; archive old `world/` directories before expecting the setting to take effect.
 - `click_slot` in the 1.12.2 QQFarm friend-farm chain should use the native `windowClick(...)` path; if that flow regresses, check the deployed mod jar first.
 - If full reports failures around `click_chat_text` or `query_chat_style`, verify the test catalog targets the clickable default-channel line rather than a newer system chat line.
 - `Minimize-TestCellServerPlugins.ps1` is for `F:/minecraft/test-cells/server-cell-*` only. Do not casually apply it to `F:/minecraft/server/paper-1.12.2/plugins`.

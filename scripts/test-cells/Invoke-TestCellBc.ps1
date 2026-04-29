@@ -83,7 +83,7 @@ function Get-BcJavaProcess {
     return Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -eq 'java.exe' -and
-            $_.CommandLine -match [regex]::Escape($bcConfig.serverDir)
+            $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $bcConfig.serverDir)
         } |
         Select-Object -First 1
 }
@@ -92,7 +92,7 @@ function Get-BcCmdProcesses {
     @(Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -eq 'cmd.exe' -and
-            $_.CommandLine -match [regex]::Escape($bcConfig.serverDir)
+            $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $bcConfig.serverDir)
         })
 }
 
@@ -160,6 +160,7 @@ function Sync-BcConfigFile {
         forgeSupport = $bcConfig.forgeSupport
         motd = $bcConfig.motd
         maxPlayers = $bcConfig.maxPlayers
+        serverConnectTimeoutMs = $bcConfig.serverConnectTimeoutMs
     } -Backends $Backends -DefaultBackendId $DefaultBackendId
 
     $changed = $true
@@ -206,12 +207,20 @@ function Stop-BcProxy {
         portReleased = $false
     }
 
-    foreach ($proc in @(Get-BcCmdProcesses)) {
-        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
-        $stopped.cmdPids += $proc.ProcessId
-    }
-
+    $bcCmds = @(Get-BcCmdProcesses)
+    $bcCmdDescendants = @(Get-TestCellDescendantProcesses -RootProcessIds @($bcCmds | Select-Object -ExpandProperty ProcessId))
     $javaIds = New-Object 'System.Collections.Generic.HashSet[int]'
+    foreach ($proc in $bcCmdDescendants) {
+        if ($proc.Name -eq 'java.exe') {
+            $javaIds.Add([int]$proc.ProcessId) | Out-Null
+            if ($stopped.javaPids -notcontains $proc.ProcessId) {
+                $stopped.javaPids += $proc.ProcessId
+            }
+        }
+    }
+    $bcTree = Stop-TestCellProcessTree -RootProcesses $bcCmds
+    $stopped.cmdPids = @($stopped.cmdPids + @($bcTree.rootPids) | Select-Object -Unique)
+
     foreach ($proc in @(Get-ProcessesByIds -ProcessIds (Get-BcProcessIdsByPort -Port $bcConfig.listenPort))) {
         if ($proc.Name -eq 'java.exe') {
             $javaIds.Add([int]$proc.ProcessId) | Out-Null
@@ -220,14 +229,16 @@ function Stop-BcProxy {
     foreach ($proc in @(Get-CimInstance Win32_Process |
             Where-Object {
                 $_.Name -eq 'java.exe' -and
-                $_.CommandLine -match [regex]::Escape($bcConfig.serverDir)
+                $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $bcConfig.serverDir)
             })) {
         $javaIds.Add([int]$proc.ProcessId) | Out-Null
     }
 
     foreach ($javaId in @($javaIds)) {
         Stop-Process -Id $javaId -Force -ErrorAction SilentlyContinue
-        $stopped.javaPids += $javaId
+        if ($stopped.javaPids -notcontains $javaId) {
+            $stopped.javaPids += $javaId
+        }
     }
 
     $stopped.portReleased = Wait-ForPortRelease -Port $bcConfig.listenPort -TimeoutSec 20

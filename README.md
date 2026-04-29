@@ -3,13 +3,13 @@
 [![Build & Release](https://github.com/zz314657917/BlackBoxPro/actions/workflows/release.yml/badge.svg)](https://github.com/zz314657917/BlackBoxPro/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Minecraft 自动化黑盒测试框架。服务端插件通过 Plugin Message Channel 向客户端 Mod 下发 JSON 指令，Mod 在客户端模拟真实玩家行为（移动、交互、GUI 操作、截图、查询等），并回传结果，用于对服务端插件逻辑进行自动化功能测试。
+Minecraft 自动化黑盒测试框架。当前真实主链已经收口为 HTTP 中继：服务端插件与外部工具通过 HTTP 调用客户端 Mod 执行动作、截图和查询。Plugin Message Channel 相关描述主要是历史架构背景，不应再当成当前实现真相。
 
 ## 特性
 
-- 112 个 Action（1.21.x），105 个 Action（1.12.2），覆盖 Minecraft 全部 Serverbound 协议包 + 查询 + 复合行为
+- 当前 `ActionCatalog` 已登记 115 个 action；如需精确数量，以 `common/src/main/kotlin/com/blackboxpro/common/action/ActionCatalog.kt` 或运行时 `/status` 为准
 - 五端同步支持：Fabric 1.21.11 / NeoForge 1.21.11 / Fabric 1.21.1 / NeoForge 1.21.1 / Forge 1.12.2
-- 双通道通讯：Plugin Message Channel（服务端→客户端）+ HTTP API（外部工具直连 Mod）
+- 当前生产链路以 HTTP API 为主；Plugin Message Channel 描述主要保留为历史背景
 - 物理引擎驱动的移动系统（InjectedInput），支持碰撞检测与 A* 寻路
 - 截图系统：普通截图 + Tooltip 渲染截图（`screenshot_tooltip`），支持帧缓冲捕获
 - 完整的查询系统：玩家状态、方块、世界、容器、记分板、Boss Bar、聊天历史等 17 种查询
@@ -18,11 +18,11 @@ Minecraft 自动化黑盒测试框架。服务端插件通过 Plugin Message Cha
 ## 架构
 
 ```text
-┌─────────────────────┐     blackbox:command      ┌──────────────────────┐
+┌─────────────────────┐      HTTP /execute        ┌──────────────────────┐
 │   Bukkit Server     │ ────────────────────────▶ │  Fabric / NeoForge   │
 │   (plugin 模块)     │                           │  / Forge 客户端 Mod  │
 │                     │ ◀──────────────────────── │                      │
-│                     │     blackbox:response     │                      │
+│                     │       HTTP /status        │                      │
 └─────────────────────┘                           └──────────────────────┘
 
 外部工具 ──── HTTP POST ────▶ Mod (:38081) 或 Plugin (:38080)
@@ -79,7 +79,7 @@ BlackBoxPro/
 
 ## 支持的行为
 
-1.21.x 端共 112 个 Action，1.12.2 端共 105 个（为最大兼容子集）。
+action 数量会持续漂移；如果需要精确口径，优先查 `ActionCatalog.kt` 或运行时 `StatusHandler`。下面的分类表只作为能力分布参考，不应当成版本锁定数字。
 
 | 分类 | 示例 | 1.21.x | 1.12.2 |
 |------|------|:------:|:------:|
@@ -96,30 +96,6 @@ BlackBoxPro/
 | 查询 | `query_player_state`, `query_container_slots`, `query_tooltip_state` | 17 | 17 |
 
 ## 通讯协议
-
-### Plugin Message Channel
-
-消息格式：JSON over Plugin Message Channel（VarInt length + UTF-8 bytes）。
-
-指令（Server → Client）：
-```json
-{
-  "id": "uuid",
-  "action": "screenshot",
-  "params": { "testId": "shop_gui_test", "prefix": "after_warp" },
-  "delay": 0
-}
-```
-
-响应（Client → Server）：
-```json
-{
-  "id": "uuid",
-  "status": "success",
-  "message": "Screenshot saved: 001_after_warp.png",
-  "data": { "filePath": "screenshots/blackboxpro/Steve/shop_gui_test/001_after_warp.png" }
-}
-```
 
 ### HTTP API
 
@@ -148,15 +124,24 @@ curl -sf http://localhost:38081/status
 # 全量构建并收集产物到根 build/libs
 ./gradlew buildAll
 
-# 仅构建 1.21.x mod（runtime + fabric + neoforge）
-./gradlew mod_buildAll
-
 # 仅构建服务端插件
 ./gradlew plugin_build
 
 # 仅构建 Forge 1.12.2
 ./gradlew forge1122_build
+
+# 仅构建 Forge 1.20.1
+./gradlew forge1201_build
+
+# 如需单独跑客户端聚合
+./gradlew -p mod buildAll
 ```
+
+说明：
+
+- 根 `build.gradle.kts` 当前没有 `mod_buildAll` 任务。
+- 如果只想构建客户端聚合，使用 `./gradlew -p mod buildAll`；如果想走根聚合，使用 `./gradlew buildAll`。
+- 1.12.2 Germ / BC 本地回归的默认入口与约束，优先看 `knowledge/03-build-and-verify.md`、`knowledge/05-current-focus.md`、`knowledge/06-test-system.md`。
 
 ### 产物路径
 

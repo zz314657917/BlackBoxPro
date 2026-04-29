@@ -70,6 +70,7 @@ function Load-TestCellBcConfig {
         forgeSupport = ConvertTo-TestCellBcBool -Value $raw.forgeSupport -DefaultValue $false
         motd = if ([string]::IsNullOrWhiteSpace($raw.motd)) { '&6BlackBoxPro BC' } else { [string]$raw.motd }
         maxPlayers = if ($raw.maxPlayers) { [int]$raw.maxPlayers } else { 20 }
+        serverConnectTimeoutMs = if ($raw.serverConnectTimeoutMs) { [int]$raw.serverConnectTimeoutMs } else { 5000 }
         defaultBackend = if ([string]::IsNullOrWhiteSpace($raw.defaultBackend)) { $null } else { [string]$raw.defaultBackend }
         sourceConfigs = @($sourceConfigs | ForEach-Object { Resolve-TestCellBcPath -BaseDir $baseDir -Path $_ })
     }
@@ -545,6 +546,7 @@ function New-TestCellBcWaterfallConfigText {
     $lines.Add(('online_mode: {0}' -f $Config.onlineMode.ToString().ToLowerInvariant())) | Out-Null
     $lines.Add(('ip_forward: {0}' -f $Config.ipForward.ToString().ToLowerInvariant())) | Out-Null
     $lines.Add(('forge_support: {0}' -f $Config.forgeSupport.ToString().ToLowerInvariant())) | Out-Null
+    $lines.Add(('server_connect_timeout: {0}' -f [int]$Config.serverConnectTimeoutMs)) | Out-Null
     $lines.Add('network_compression_threshold: 256') | Out-Null
     $lines.Add('disabled_commands: []') | Out-Null
     $lines.Add('timeout: 30000') | Out-Null

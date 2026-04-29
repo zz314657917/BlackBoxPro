@@ -2,128 +2,119 @@
 
 ## 背景
 
-- 用户正在把 `BlackBoxPro` 往“更方便自动化测试 Germ 插件、test-cell 池和 BC 多后端链路”的方向推进。
-- 当前仓库已有原版容器点击、hover、tooltip、屏幕状态查询等能力，但这些能力主要面向 `GuiContainer` / 原版槽位体系。
-- 本轮新增了 1.12.2 Forge 的通用屏幕鼠标层，并同步扩展了本机 test-cell 基础设施：
-  - `cell-01..05` 都应保持 Germ 可用。
-  - `cell-01..05` 都可作为 1.12.2 BC 后端。
-  - BC smoke 已支持 5 后端自动验证和自动收尾。
+- 用户需要一组专门测试 Forge 1.12.2 模组的 BlackBoxPro test-cell。
+- 用户已确认方案：服务端直接复制 `cell-01`，客户端也直接复制 `cell-01`；先有 `cell-20`，本轮追加 `cell-21/22`。
+- 普通 1.12.2 插件/Germ/BC 回归仍使用 `cell-01..05`，Forge 1.20.1 仍使用 `cell-06..08`；`cell-20..22` 不混入这些池。
 
 ## 当前目标
 
-- 收口当前工作树，让下一次会话能快速判断：
-  - 哪些功能已经实现并验证。
-  - 哪些只是基础设施更新。
-  - 哪些还需要继续做。
-  - 测试环境是否干净。
+- 收口 `cell-20..22` 作为 Forge 1.12.2 模组专测池：
+  - 独立配置文件
+  - 独立服务端与客户端目录
+  - 独立端口与 lease
+  - 可同步被测模组到服务端和客户端 `mods/`
+  - 可一条命令做 startup/smoke 并自动清理
 
 ## 本次已完成
 
-- Germ / 通用屏幕鼠标 action：
-  - 新增设计文档：`docs/superpowers/specs/2026-04-24-screen-mouse-actions-design.md`
-  - 新增 action 真源：`move_mouse`、`click_mouse`、`click_screen_at`、`query_cursor_state`
-  - 新增 1.12.2 Forge 实现：`ScreenMouseHelper`、`MoveMouseAction`、`ClickMouseAction`、`ClickScreenAtAction`、`QueryCursorStateAction`
-  - 更新 `ActionCatalog`、`ActionRegistry`、插件 API 和 `BlackBoxTestCatalog`
-- 1.12.2 test-cell 基线：
-  - `cell-01` 作为 1.12.2 baseline source
-  - `cell-01..05` 服务端插件基线包含 `GermPlugin`
-  - `cell-01..05` bot mod 基线包含 `GermMod`
-  - 新增 `Sync-TestCellBaselinePlugins.ps1` / `TestCellBaselinePlugins.ps1` 和两套 baseline JSON
-- 多会话与清理：
-  - 新增/调整 `Run-TestCellRegression.ps1`，完整回归默认执行 stop/release
-  - `Invoke-TestCell.ps1` / `Invoke-TestCell1201.ps1` 增强和平难度、怪物生成关闭、死亡自动复活等测试前置
-  - 脚本清理时注意 `cmd/java/javaw`，避免只留下提示不关进程
-- BC 测试链路：
-  - 新增 `Invoke-TestCellBc.ps1`、`Prepare-TestCellBcBackends.ps1`、`Run-TestCellBcSmoke.ps1`、`TestCellBcCommon.ps1`
-  - 新增临时 helper 构建入口 `Build-TestCellBcBridgeHelper.ps1`
-  - `Run-TestCellBcSmoke.ps1` 已支持 `-BackendCellIds` 多后端参数
-  - BC 5 后端 smoke 已通过：`cell-02 -> cell-01 -> cell-03 -> cell-04 -> cell-05`
-  - bot 连接 BC 必须用 `localhost:25645`，不要用 `127.0.0.1:25645`
-  - BC smoke cleanup 已确认会 stop BC、stop bot、restore 后端配置、release lease、删除 helper jar 和 launcher
-- 文档/技能/外部 AI：
-  - `.cursor/rules/blackboxpro-local-regression.mdc` 已生成
-  - `$blackboxpro-local-regression` 已补入 BC 5 后端 smoke、`localhost`、中断后清理规则
-  - `$blackboxpro-manual-session` 的 Germ 手测 profile 已从 `cell-04/05` 扩到 `cell-01..05`
-  - `knowledge/03-build-and-verify.md` 和 `knowledge/06-test-system.md` 已同步主要测试入口
+- 新增 `scripts/test-cells/cells-mod1122.json`，默认 cell 为 `cell-20`，当前池包含 `cell-20..22`。
+- 新增 `scripts/test-cells/Provision-TestCellMod1122.ps1`：
+  - 默认从 `scripts/test-cells/cells.json` 的 `cell-01` 读取源服务端和源客户端。
+  - 默认目标为 `cell-21/22`，用于给已有 `cell-20` 追加两格模组测试端。
+  - 如需重建完整三格池，显式传 `-TargetCellIds cell-20,cell-21,cell-22 -Force`。
+  - 复制服务端到 `F:/minecraft/test-cells/server-cell-mod1122-20..22`。
+  - 复制客户端版本目录到 `G:/MC/game/BlackBoxProTestCells/cell-20..22/.minecraft/versions/bot`。
+  - `assets` / `libraries` 用 junction 指向源 cell 的共享资源。
+  - 重写 `server.properties` 和 `plugins/BlackBoxPro/config.yml` 的端口与 dual 模式。
+  - `-Force` 删除前校验目标必须位于 `AllowedServerRoot` / `AllowedClientRoot` 下，避免误删非 test-cell 目录。
+- 新增 `scripts/test-cells/Sync-TestCellMod1122Artifacts.ps1`：
+  - 默认把指定模组 jar 同步到 `cell-20..22` 服务端和客户端 `mods/`。
+  - 默认按 jar 名推断清理模式，例如 `cloudstorage-*.jar`。
+- 新增 `scripts/test-cells/Run-TestCellMod1122Regression.ps1`：
+  - 支持 `-Scope startup|smoke`。
+  - 支持 `-ModJar`、`-AcquireCell`、`-KeepCell`。
+  - `-AcquireCell` 未显式传 `-CellId` 时，从 `cell-20..22` 里抢一个 ready cell。
+  - 默认结束后执行 `stop + release`。
+- 加固 `Invoke-TestCell.ps1` 的 stop 收尾：先杀匹配 server cmd，再杀 server/bot Java，随后二次清扫孤儿 `cmd.exe`，避免留下无监听但窗口未关的残留。
+- 1.12.2 测试客户端资源已补齐：
+  - `辅助-jei.jar` 已复制到 `cell-01..05`、隔离 `cell-10`、`cell-20..22` 的 `mods/`
+  - `Minecraft-Mod-Language-Modpack.zip` 已复制到同一批客户端的 `resourcepacks/`
+  - `baseline-1122.json` 已加入 JEI、资源包模式和 `botDefaultResourcePacks`
+  - `Sync-TestCellBaselinePlugins.ps1` 已支持 bot `resourcepacks/` 同步，并会把默认资源包写入 `options.txt`
+  - `Set-TestCellBotResourcePacks.ps1` 已补为一键同步/启用脚本，当前 `cell-01..05`、隔离 `cell-10`、`cell-20..22` 都已默认加载 `file/Minecraft-Mod-Language-Modpack.zip`
+- 1.12.2 测试服务端已统一超平坦：`cell-01..05`、隔离 `server-cell-10`、`cell-20..22` 的 `server.properties` 均为 `level-type=FLAT`、`generator-settings=`；旧 `world/` 已归档到各自 `_world-backups/world-20260428-181025`。
+- 已用 `cell-03` 做真实启动验证：relay `query_player_state` 返回 overworld、`y=4.0`、满血且非死亡；验证后已 stop/release，目标监听端口与匹配 `cmd/java/javaw` 进程均为 0。
+- 更新 `knowledge/05-current-focus.md`、`knowledge/06-test-system.md` 和全局 `$blackboxpro-local-regression` skill 的 `cell-20..22` 入口说明。
 
 ## 已确认事实
 
-- 2026-04-24 曾本地执行 `./gradlew.bat forge1122_build plugin_build` 通过。
-- 2026-04-25 收尾阶段重新执行 `./gradlew.bat forge1122_build plugin_build` 通过；本机默认 Java 8 会失败，需临时指定 JDK 21，例如 `F:/mcplugins/.local-tools/temurin21/jdk-21.0.10+7`。
-- `cell-05` 部署新 `BlackBoxPro-forge-1.12.2-2.2.4.jar` 后，bot `/status` 的 action 数量从旧值提升到 `109`，说明新 action 已被运行时识别。
-- `query_cursor_state` 已在 `cell-05` 真实返回：
-  - Germ 界面下能读到 `screenClass`
-  - 能返回 `mouseX/mouseY`
-  - 能返回 `scaledWidth/scaledHeight`
-- `move_mouse` 已验证会实际改变 `query_cursor_state.mouseX/mouseY`。
-- `click_screen_at` 已在原版 `GuiInventory` 中验证生效：
-  - 点击前 `query_inventory_slot(slot=0)` 为 `minecraft:stone`
-  - 调用 `click_screen_at`
-  - 点击后 `query_inventory_slot(slot=0)` 变为空
-- 2026-04-25 已确认 `cell-01..05` 都有：
-  - 服务端：`GermPlugin-Snapshot-4.4.2-11.jar`
-  - Bot：`GermMod-Snapshot-4.4.2-11.jar`
-- 2026-04-25 已执行 `Sync-TestCellBaselinePlugins.ps1 -DryRun`，同步后无待复制/更新差异。
-- 2026-04-25 已执行 BC 5 后端 smoke：
-  - 命令：`Run-TestCellBcSmoke.ps1 -BotCellId cell-02 -DefaultBackendId cell-02 -BackendCellIds cell-02,cell-01,cell-03,cell-04,cell-05`
-  - 结果：`ok=true`
-  - `bcConnect=localhost:25645`
-  - cleanup 后监听端口为 `0`，匹配测试进程为 `0`，临时 helper/launcher 为 `0`
+- `cell-20..22` 配置：
+  - `cell-20`：`F:/minecraft/test-cells/server-cell-mod1122-20`、`G:/MC/game/BlackBoxProTestCells/cell-20/.minecraft/versions/bot`、`25720 / 38200 / 38201`
+  - `cell-21`：`F:/minecraft/test-cells/server-cell-mod1122-21`、`G:/MC/game/BlackBoxProTestCells/cell-21/.minecraft/versions/bot`、`25721 / 38210 / 38211`
+  - `cell-22`：`F:/minecraft/test-cells/server-cell-mod1122-22`、`G:/MC/game/BlackBoxProTestCells/cell-22/.minecraft/versions/bot`、`25722 / 38220 / 38221`
+  - 服务端 Java：`C:/Program Files/Java/jdk1.8.0_481/bin/java.exe`
+  - 客户端 Java：`C:/Program Files/Java/jdk1.8.0_481/bin/javaw.exe`
+  - 1.12.2 服务端默认内存：`512M / 1536M`
+  - 1.12.2 客户端默认内存：`512M / 1024M`
+- `Provision-TestCellMod1122.ps1` 已成功追加执行，输出确认 `sourceCellId=cell-01`、`provisioned.id=cell-21,cell-22`。
+- provision 后 `Get-TestCellStatus.ps1 -ConfigPath scripts/test-cells/cells-mod1122.json` 返回 `cell-20..22` 全部 `ready=true`、`locked=false`。
+- `Acquire-TestCell.ps1 -CellId cell-21/cell-22 -ReadyOnly -ConfigPath scripts/test-cells/cells-mod1122.json` 已成功抢占，`Release-TestCell.ps1` 已成功释放。
+- `cell-21/22` 的 `assets` 和 `libraries` 都是 `Directory, ReparsePoint`，目标指向 `cell-01` 的共享资源目录。
 
 ## 待验证点
 
-- 在真实 Germ GUI（本轮用 `SkinWardrobe` 的 `/sw open` 验证）里，`click_screen_at` 目前尚未观察到稳定 UI 响应。
-- 这说明方案 A 已经把“通用屏幕鼠标层”做通，但 Germ 页面是否真正消费 `GuiScreen.mouseClicked(...)` 还不能下结论。
-- 现代端 `1.21.11` / `1.21.1` 还没有同步新增的屏幕鼠标 action。
-- BC 多后端链路目前依赖临时 `TestCellBcBridgeHelper.jar` 的 `/bbswitch <server>`，不建议现在产品化为正式长期插件；除非后续手测也需要长期跨服切换命令。
-- 当前工作树还有大量未提交文件，下一步提交前需要按主题拆分或至少明确一次性提交边界。
+- 本轮已对 `cell-21/22` 做了 startup 验证：服务端 `/status`、客户端 `/status`、`connect_to_server` 和 relay `query_player_state` 均成功，并自动 stop/release。
+- 尚未同步具体业务模组 jar 做功能测试。
+- 后续测试 CloudStorage 或其他 Forge 1.12.2 模组时，需要先构建目标 jar，再通过 `Sync-TestCellMod1122Artifacts.ps1` 或 `Run-TestCellMod1122Regression.ps1 -ModJar` 同步。
+- `Scope smoke` 还未在 `cell-20..22` 上跑完整 `run_test`。
 
 ## 当前结论
 
-- 方案 A 值得保留，第一版以 `1.12.2 Forge` 为边界是正确的。
-- 当前版本已经把 `BlackBoxPro` 从“只会点原版容器槽位”推进到“可以对任意屏幕做坐标级鼠标移动与点击”。
-- 对 Germ 自动化而言，方案 A 是必要基础层，但还不等于“Germ 所有界面立刻可点”；如果真实 Germ 页面不吃普通点击，后续需要方案 B 的专用 probe / hook。
-- test-cell 基础设施已经从单 cell 回归推进到：
-  - `cell-01..05` 并发池
-  - 1.12.2 / 1.20.1 分离
-  - 1.12.2 Germ 公共基线
-  - BC 5 后端 smoke
-  - 中断后可恢复/可清理
+- `cell-20..22` 已可作为独立 Forge 1.12.2 模组测试池使用。
+- 用户澄清的复制策略已落实：服务端复制 `cell-01`，客户端也复制 `cell-01`。
+- 环境验证后已自动收尾，当前没有 `cell-20..22` 相关监听端口或 `cmd/java/javaw` 残留进程。
 
 ## 下一步
 
-1. 提交前复核当前工作树，建议按以下主题拆分：
-   - 屏幕鼠标 action
-   - test-cell 基线与清理脚本
-   - BC 准备/5 后端 smoke
-   - 文档、技能和 Cursor rule
-2. 继续用真实 Germ 页面做坐标夹具验证，确认是否只是坐标不准。
-3. 如果确认 Germ 页面不消费 `GuiScreen.mouseClicked(...)`，再进入方案 B：
-   - 做可选 `GermScreenProbe`
-   - 读取组件树 / hover / 命中测试
-4. 如果要长期手测 BC 跨服，再评估是否把临时 `TestCellBcBridgeHelper` 产品化；当前自动化 smoke 不需要正式 BC 插件。
+1. 如果要测试 CloudStorage，先在 `F:/mcplugins/mod/CloudStorage` 构建 jar，再执行：
+   `powershell -ExecutionPolicy Bypass -File "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/Run-TestCellMod1122Regression.ps1" -Scope startup -ModJar "F:/mcplugins/mod/CloudStorage/build/libs/cloudstorage-0.1.0-SNAPSHOT.jar" -AcquireCell`
+2. 如果要人工进游戏测 GUI，在上面的命令后加 `-KeepCell`，结束后手动执行：
+   `powershell -ExecutionPolicy Bypass -File "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/Invoke-TestCell.ps1" -Mode stop -CellId <cell-id> -ConfigPath "F:/mcplugins/BlackBoxPro-dev-2.0/scripts/test-cells/cells-mod1122.json"`
+3. 如果要把这批 test-cell 基础设施提交，先区分已有历史改动和本轮新增文件，避免把无关 `cells.json` 本地路径状态混入提交。
 
 ## 验证记录
 
-- 2026-04-24 构建：
-  - `./gradlew.bat forge1122_build plugin_build`
-- 2026-04-24 真实回归：
-  - `cell-05` ensure 成功
-  - `query_cursor_state` 成功
-  - `move_mouse` 成功
-  - `click_screen_at` 在原版 `GuiInventory` 成功改变槽位状态
-  - `click_screen_at` 在 Germ `SkinWardrobe` 页面尚未观察到稳定 UI 变化
-- 2026-04-25 基线同步：
-  - `Sync-TestCellBaselinePlugins.ps1`
-  - `Sync-TestCellBaselinePlugins.ps1 -DryRun`
-- 2026-04-25 BC 5 后端：
-  - `Run-TestCellBcSmoke.ps1 -BotCellId cell-02 -DefaultBackendId cell-02 -BackendCellIds cell-02,cell-01,cell-03,cell-04,cell-05`
-  - 结果 `ok=true`
-- 2026-04-25 fresh 构建：
-  - 默认 shell Java 8 下失败，错误为 Gradle 需要 JVM 17+
-  - 临时指定 `JAVA_HOME=F:/mcplugins/.local-tools/temurin21/jdk-21.0.10+7` 后执行 `./gradlew.bat forge1122_build plugin_build`
-  - 结果通过，仅有 Java 编译 deprecation / unchecked 警告
-- 2026-04-25 收尾状态：
-  - test-cell 监听端口：`0`
-  - 匹配 `cmd/java/javaw` 测试进程：`0`
-  - 临时 `TestCellBcBridgeHelper.jar` / `start-bc-backend-*.cmd`：`0`
+- PowerShell 静态解析：
+  - `Provision-TestCellMod1122.ps1`：`errorCount=0`
+  - `Sync-TestCellMod1122Artifacts.ps1`：`errorCount=0`
+  - `Run-TestCellMod1122Regression.ps1`：`errorCount=0`
+- 当前状态：
+  - `Get-TestCellStatus.ps1 -ConfigPath scripts/test-cells/cells-mod1122.json`
+  - `cell-20..22` 全部 `ready=true`、`locked=false`
+- 本轮追加准备：
+  - `Provision-TestCellMod1122.ps1`
+  - 结果 `sourceCellId=cell-01`，`provisioned.id=cell-21,cell-22`
+- lease 验证：
+  - `Acquire-TestCell.ps1 -CellId cell-21 -Owner codex-mod1122-pool-check-* -ConfigPath scripts/test-cells/cells-mod1122.json -ReadyOnly`
+  - `Release-TestCell.ps1 -CellId cell-21 -Owner codex-mod1122-pool-check-* -ConfigPath scripts/test-cells/cells-mod1122.json`
+  - `Acquire-TestCell.ps1 -CellId cell-22 -Owner codex-mod1122-pool-check-* -ConfigPath scripts/test-cells/cells-mod1122.json -ReadyOnly`
+  - `Release-TestCell.ps1 -CellId cell-22 -Owner codex-mod1122-pool-check-* -ConfigPath scripts/test-cells/cells-mod1122.json`
+- startup 验证：
+  - `Run-TestCellMod1122Regression.ps1 -Scope startup -CellId cell-21 -AcquireCell -LeaseOwner codex-mod1122-startup-cell21`
+  - `cell-21` 结果 `ok=true`；服务端 `httpPort=38210`、`modHttpAddress=http://localhost:38211`、`ready=true`；bot `httpPort=38211`、`actions=112`、`ready=true`；连接 `localhost:25721`；relay `query_player_state` 成功；cleanup stop/release 成功
+  - `Run-TestCellMod1122Regression.ps1 -Scope startup -CellId cell-22 -AcquireCell -LeaseOwner codex-mod1122-startup-cell22`
+  - `cell-22` 结果 `ok=true`；服务端 `httpPort=38220`、`modHttpAddress=http://localhost:38221`、`ready=true`；bot `httpPort=38221`、`actions=112`、`ready=true`；连接 `localhost:25722`；relay `query_player_state` 成功；cleanup stop/release 成功
+- 收尾复查：
+  - `Get-TestCellStatus.ps1` 返回 `cell-20..22` 全部 `ready=true`、`locked=false`
+  - `25720/38200/38201/25721/38210/38211/25722/38220/38221` 无监听
+  - 未发现匹配 `cell-20..22` 路径的 `cmd.exe/java.exe/javaw.exe` 残留进程
+  - 复查中发现并清掉过旧 `cell-20` 空 cmd / Java 残留，已通过二次清扫逻辑补强 stop 脚本
+- 内存配置：
+  - `scripts/test-cells/cells.json` 和 `scripts/test-cells/cells-mod1122.json` 的 1.12.2 服务端默认值已改为 `serverMinMemoryMb=512`、`serverMaxMemoryMb=1536`
+  - 已用 `cell-03` 实测新参数启动：服务端命令行为 `-Xms512M -Xmx1536M`，插件 `/status` 返回 `httpPort=38100`、`ready=true`，客户端 `/status` 返回 `httpPort=38101`、`ready=true`
+  - `cell-03` 实测后已 stop/release，最终相关端口和匹配 `cmd/java/javaw` 进程均为 `0`
+- 客户端资源：
+  - JEI hash：`A4EDF0CB590409D48AD94363F917779C21661544C67651B69A526E1291996991`
+  - 语言包 hash：`CF9FC259349A89D61E748234A8C58F3E3E88CC7BD80DE8FF3EE006D7475C4B9F`
+  - `Sync-TestCellBaselinePlugins.ps1 -DryRun` 已确认 `cell-02..05` 的 JEI 与语言包均为 `skipped`
+  - `Set-TestCellBotResourcePacks.ps1` 已确认 `cell-01..05`、`cell-10`、`cell-20..22` 的 `options.txt` 均为 `resourcePacks:["file/Minecraft-Mod-Language-Modpack.zip"]`

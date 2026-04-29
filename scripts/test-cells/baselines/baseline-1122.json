@@ -13,6 +13,7 @@
     "^BlackBoxPro-Plugin-.*\\.jar$",
     "^PlayerCurrency.*\\.jar$",
     "^PlayerPoints.*\\.jar$",
+    "^LuckPerms.*\\.jar$",
     ".*GermPlugin.*\\.jar$",
     ".*ProtocolLib.*\\.jar$",
     ".*Vault.*\\.jar$",
@@ -20,6 +21,13 @@
   ],
   "botModPatterns": [
     "^BlackBoxPro-forge-1\\.12\\.2-.*\\.jar$",
-    ".*GermMod.*\\.jar$"
+    ".*GermMod.*\\.jar$",
+    "^辅助-jei\\.jar$"
+  ],
+  "botResourcePackPatterns": [
+    "^Minecraft-Mod-Language-Modpack\\.zip$"
+  ],
+  "botDefaultResourcePacks": [
+    "Minecraft-Mod-Language-Modpack.zip"
   ]
 }

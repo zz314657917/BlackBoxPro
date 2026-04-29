@@ -64,13 +64,7 @@ function Add-Error {
 function Get-CommandLinePathPattern {
     param([string]$Path)
 
-    $variants = @(
-        $Path,
-        ($Path -replace '/', '\'),
-        ($Path -replace '\\', '/')
-    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
-
-    return '(' + (@($variants | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')'
+    return Get-TestCellCommandLinePathPattern -Path $Path
 }
 
 function Stop-PreparedBackendProcesses {
@@ -82,16 +76,24 @@ function Stop-PreparedBackendProcesses {
         javaPids = @()
     }
 
-    foreach ($proc in @(Get-CimInstance Win32_Process |
-            Where-Object {
-                $_.Name -eq 'cmd.exe' -and
-                $_.CommandLine -match (Get-CommandLinePathPattern -Path $Cell.serverDir)
-            })) {
-        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
-        $stopped.cmdPids += $proc.ProcessId
-    }
-
+    $cmdProcesses = @(Get-CimInstance Win32_Process |
+        Where-Object {
+            $_.Name -eq 'cmd.exe' -and
+            $_.CommandLine -match (Get-CommandLinePathPattern -Path $Cell.serverDir)
+        })
     $javaIds = New-Object 'System.Collections.Generic.HashSet[int]'
+    $cmdDescendants = @(Get-TestCellDescendantProcesses -RootProcessIds @($cmdProcesses | Select-Object -ExpandProperty ProcessId))
+    foreach ($proc in $cmdDescendants) {
+        if ($proc.Name -eq 'java.exe') {
+            $javaIds.Add([int]$proc.ProcessId) | Out-Null
+            if ($stopped.javaPids -notcontains $proc.ProcessId) {
+                $stopped.javaPids += $proc.ProcessId
+            }
+        }
+    }
+    $cmdTree = Stop-TestCellProcessTree -RootProcesses $cmdProcesses
+    $stopped.cmdPids = @($stopped.cmdPids + @($cmdTree.rootPids) | Select-Object -Unique)
+
     foreach ($port in @($Cell.serverPort, $Cell.pluginHttpPort)) {
         $listener = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
             Where-Object { $_.LocalPort -eq $port } |
@@ -110,7 +112,9 @@ function Stop-PreparedBackendProcesses {
 
     foreach ($javaId in @($javaIds)) {
         Stop-Process -Id $javaId -Force -ErrorAction SilentlyContinue
-        $stopped.javaPids += $javaId
+        if ($stopped.javaPids -notcontains $javaId) {
+            $stopped.javaPids += $javaId
+        }
     }
 
     return [pscustomobject]$stopped

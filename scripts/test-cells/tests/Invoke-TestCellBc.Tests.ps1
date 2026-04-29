@@ -49,7 +49,7 @@ function New-TestCellLeaseFixtureConfig {
             id = 'cell-01'
             enabled = $true
             serverDir = (Join-Path (Split-Path -Parent $Path) 'server-cell-01')
-            serverPort = 25565
+            serverPort = 25570
         },
         [ordered]@{
             id = 'cell-02'
@@ -67,6 +67,31 @@ function New-TestCellLeaseFixtureConfig {
 }
 
 Describe 'TestCellBcCommon' {
+    It 'uses hidden clients for automation and normal windows when ShowClient is requested' {
+        (Get-TestCellClientWindowStyle -ShowClient:$false).ToString() | Should Be 'Hidden'
+        (Get-TestCellClientWindowStyle -ShowClient:$true).ToString() | Should Be 'Normal'
+    }
+
+    It 'builds command-line path patterns that match slash and backslash variants' {
+        $pattern = Get-TestCellCommandLinePathPattern -Path 'F:/minecraft/test-cells/server-cell-02'
+
+        'cmd /k cd /d "F:\minecraft\test-cells\server-cell-02"' | Should Match $pattern
+        'java -Dblackboxpro.serverDir="F:/minecraft/test-cells/server-cell-02" -jar catserver.jar' | Should Match $pattern
+    }
+
+    It 'discovers descendant processes recursively from controller pids' {
+        $processes = @(
+            [pscustomobject]@{ ProcessId = 100; ParentProcessId = 1; Name = 'cmd.exe' },
+            [pscustomobject]@{ ProcessId = 101; ParentProcessId = 100; Name = 'java.exe' },
+            [pscustomobject]@{ ProcessId = 102; ParentProcessId = 101; Name = 'conhost.exe' },
+            [pscustomobject]@{ ProcessId = 200; ParentProcessId = 1; Name = 'java.exe' }
+        )
+
+        $descendants = Get-TestCellDescendantProcesses -RootProcessIds @(100) -AllProcesses $processes
+
+        (@($descendants | Select-Object -ExpandProperty ProcessId) -join ',') | Should Be '101,102'
+    }
+
     It 'discovers enabled backends and falls back to localhost when server-ip is blank' {
         $root = Join-Path $env:TEMP ("bc-fixture-" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $root -Force | Out-Null
@@ -83,7 +108,7 @@ Describe 'TestCellBcCommon' {
                     id = 'cell-01'
                     enabled = $true
                     serverDir = $server01
-                    serverPort = 25565
+                    serverPort = 25570
                 },
                 [ordered]@{
                     id = 'cell-02'
@@ -97,7 +122,7 @@ Describe 'TestCellBcCommon' {
 
             $result.backends.Count | Should Be 2
             $result.backends[0].id | Should Be 'cell-01'
-            $result.backends[0].address | Should Be '127.0.0.1:25565'
+            $result.backends[0].address | Should Be '127.0.0.1:25570'
             $result.backends[1].id | Should Be 'cell-02'
             $result.backends[1].address | Should Be '192.168.50.22:25575'
             $result.defaultBackendId | Should Be 'cell-02'
@@ -125,7 +150,7 @@ Describe 'TestCellBcCommon' {
                     id = 'cell-01'
                     enabled = $true
                     serverDir = $server01
-                    serverPort = 25565
+                    serverPort = 25570
                 },
                 [ordered]@{
                     id = 'cell-02'
@@ -190,7 +215,7 @@ Describe 'TestCellBcCommon' {
         } -Backends @(
             [pscustomobject]@{
                 id = 'cell-01'
-                address = '127.0.0.1:25565'
+                address = '127.0.0.1:25570'
             },
             [pscustomobject]@{
                 id = 'cell-02'
@@ -201,7 +226,7 @@ Describe 'TestCellBcCommon' {
         $text | Should Match 'host: 127\.0\.0\.1:25645'
         $text | Should Match 'servers:'
         $text | Should Match 'cell-01:'
-        $text | Should Match 'address: 127\.0\.0\.1:25565'
+        $text | Should Match 'address: 127\.0\.0\.1:25570'
         $text | Should Match '- cell-01'
     }
 
@@ -219,7 +244,7 @@ Describe 'TestCellBcCommon' {
 
             $configPath = Join-Path $root 'cells.json'
             New-TestCellJsonFixture -Path $configPath -Cells @(
-                [ordered]@{ id = 'cell-01'; enabled = $true; serverDir = $server01; serverPort = 25565 },
+                [ordered]@{ id = 'cell-01'; enabled = $true; serverDir = $server01; serverPort = 25570 },
                 [ordered]@{ id = 'cell-02'; enabled = $true; serverDir = $server02; serverPort = 25575 },
                 [ordered]@{ id = 'cell-03'; enabled = $true; serverDir = $server03; serverPort = 25585 }
             )

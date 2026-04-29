@@ -18,6 +18,136 @@ function ConvertTo-FlatHashtable {
     return $table
 }
 
+function Get-TestCellCommandLinePathPattern {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return '(?!)'
+    }
+
+    $variants = @(
+        $Path,
+        ($Path -replace '/', '\'),
+        ($Path -replace '\\', '/')
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+
+    return '(' + (@($variants | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')'
+}
+
+function Get-TestCellClientWindowStyle {
+    param([switch]$ShowClient)
+
+    if ($ShowClient) {
+        return [System.Diagnostics.ProcessWindowStyle]::Normal
+    }
+
+    return [System.Diagnostics.ProcessWindowStyle]::Hidden
+}
+
+function Get-TestCellProcessesByIds {
+    param([int[]]$ProcessIds)
+
+    $processes = @()
+    $seen = New-Object 'System.Collections.Generic.HashSet[int]'
+    foreach ($processId in @($ProcessIds | Where-Object { $_ })) {
+        if (-not $seen.Add([int]$processId)) {
+            continue
+        }
+
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId=$([int]$processId)" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($null -ne $process) {
+            $processes += $process
+        }
+    }
+    return $processes
+}
+
+function Get-TestCellDescendantProcesses {
+    param(
+        [int[]]$RootProcessIds,
+        [object[]]$AllProcesses = $null
+    )
+
+    $rootIds = @($RootProcessIds | Where-Object { $_ } | ForEach-Object { [int]$_ } | Select-Object -Unique)
+    if ($rootIds.Count -eq 0) {
+        return @()
+    }
+
+    $processes = if ($null -ne $AllProcesses) { @($AllProcesses) } else { @(Get-CimInstance Win32_Process) }
+    $childrenByParent = @{}
+    foreach ($process in $processes) {
+        if ($null -eq $process.ParentProcessId -or $null -eq $process.ProcessId) {
+            continue
+        }
+
+        $parentId = [int]$process.ParentProcessId
+        if (-not $childrenByParent.ContainsKey($parentId)) {
+            $childrenByParent[$parentId] = @()
+        }
+        $childrenByParent[$parentId] = @($childrenByParent[$parentId]) + @($process)
+    }
+
+    $queue = New-Object 'System.Collections.Generic.Queue[int]'
+    foreach ($rootId in $rootIds) {
+        $queue.Enqueue($rootId)
+    }
+
+    $seen = New-Object 'System.Collections.Generic.HashSet[int]'
+    foreach ($rootId in $rootIds) {
+        $seen.Add($rootId) | Out-Null
+    }
+
+    $descendants = @()
+    while ($queue.Count -gt 0) {
+        $parentId = $queue.Dequeue()
+        if (-not $childrenByParent.ContainsKey($parentId)) {
+            continue
+        }
+
+        foreach ($child in @($childrenByParent[$parentId])) {
+            $childId = [int]$child.ProcessId
+            if (-not $seen.Add($childId)) {
+                continue
+            }
+
+            $descendants += $child
+            $queue.Enqueue($childId)
+        }
+    }
+
+    return $descendants
+}
+
+function Stop-TestCellProcessTree {
+    param([object[]]$RootProcesses)
+
+    $roots = @($RootProcesses | Where-Object { $null -ne $_ -and $_.ProcessId })
+    $rootIds = @($roots | ForEach-Object { [int]$_.ProcessId } | Select-Object -Unique)
+    $descendants = @(Get-TestCellDescendantProcesses -RootProcessIds $rootIds)
+    $targets = @($descendants) + @($roots)
+    $stoppedIds = New-Object 'System.Collections.Generic.HashSet[int]'
+
+    foreach ($process in $targets) {
+        if ($null -eq $process -or $null -eq $process.ProcessId) {
+            continue
+        }
+
+        $processId = [int]$process.ProcessId
+        if (-not $stoppedIds.Add($processId)) {
+            continue
+        }
+
+        Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+    }
+
+    return [pscustomobject]@{
+        rootPids = $rootIds
+        descendantPids = @($descendants | ForEach-Object { [int]$_.ProcessId } | Select-Object -Unique)
+        stoppedPids = @($stoppedIds)
+    }
+}
+
 function New-MergedCellObject {
     param(
         [hashtable]$Defaults,

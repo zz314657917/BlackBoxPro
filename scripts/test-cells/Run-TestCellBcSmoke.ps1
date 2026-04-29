@@ -7,7 +7,12 @@ param(
     [string[]]$BackendCellIds = @(),
     [string]$BcConnectHost = 'localhost',
     [string]$Owner = '',
-    [string]$CrossServerCommandTemplate = 'bbswitch {target}'
+    [string]$CrossServerCommandTemplate = 'bbswitch {target}',
+    [string]$BeforeTransferHookScript = '',
+    [string]$AfterTransferHookScript = '',
+    [switch]$SkipPrepare,
+    [switch]$SkipRestore,
+    [switch]$ShowClient
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,6 +77,7 @@ $result = [ordered]@{
         targetBackendRelay = $null
         backendRelays = @()
         crossServerCommands = @()
+        hooks = @()
         cleanup = [ordered]@{}
     }
     errors = New-Object System.Collections.Generic.List[string]
@@ -210,6 +216,64 @@ function Expand-CrossServerCommand {
         Replace('{player}', [string]$BotCell.botPlayer)
 }
 
+function Invoke-TransferHook {
+    param(
+        [string]$Phase,
+        [string]$ScriptPath,
+        [object]$SourceCell,
+        [object]$TargetCell,
+        [object]$BotCell
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ScriptPath)) {
+        return $null
+    }
+    if (-not (Test-Path -LiteralPath $ScriptPath)) {
+        throw "Transfer hook script not found: $ScriptPath"
+    }
+
+    $hookArgs = @(
+        '-Phase', $Phase,
+        '-PlayerName', [string]$BotCell.botPlayer,
+        '-SourceCellId', [string]$SourceCell.id,
+        '-SourcePluginHttpPort', [string]$SourceCell.pluginHttpPort,
+        '-SourceModHttpPort', [string]$SourceCell.modHttpPort,
+        '-TargetCellId', [string]$TargetCell.id,
+        '-TargetPluginHttpPort', [string]$TargetCell.pluginHttpPort,
+        '-TargetModHttpPort', [string]$TargetCell.modHttpPort
+    )
+
+    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @hookArgs 2>&1
+    $exitCode = $LASTEXITCODE
+    $text = ($output | Out-String).Trim()
+    $json = $null
+    if (-not [string]::IsNullOrWhiteSpace($text)) {
+        try {
+            $json = $text | ConvertFrom-Json
+        } catch {
+            throw "Transfer hook returned non-JSON output for phase ${Phase}: $($_.Exception.Message); output=$text"
+        }
+    }
+
+    $entry = [ordered]@{
+        phase = $Phase
+        scriptPath = $ScriptPath
+        exitCode = $exitCode
+        json = $json
+    }
+    $result.steps.hooks += $entry
+
+    if ($exitCode -ne 0) {
+        throw "Transfer hook failed for phase ${Phase}: exitCode=$exitCode; output=$text"
+    }
+    if ($null -ne $json -and ($json.PSObject.Properties.Name -contains 'ok') -and -not [bool]$json.ok) {
+        $hookErrors = if ($json.PSObject.Properties.Name -contains 'errors') { @($json.errors) -join '; ' } else { '' }
+        throw "Transfer hook reported failure for phase ${Phase}: $hookErrors"
+    }
+
+    return [pscustomobject]$entry
+}
+
 function Get-ProcessesByIds {
     param([int[]]$ProcessIds)
 
@@ -227,13 +291,7 @@ function Get-ProcessesByIds {
 function Get-CommandLinePathPattern {
     param([string]$Path)
 
-    $variants = @(
-        $Path,
-        ($Path -replace '/', '\'),
-        ($Path -replace '\\', '/')
-    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
-
-    return '(' + (@($variants | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')'
+    return Get-TestCellCommandLinePathPattern -Path $Path
 }
 
 function Get-BackendServerProcess {
@@ -280,12 +338,20 @@ function Stop-BackendServer {
         javaPids = @()
     }
 
-    foreach ($proc in @(Get-BackendCmdProcesses -Cell $Cell)) {
-        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
-        $stopped.cmdPids += $proc.ProcessId
-    }
-
+    $backendCmds = @(Get-BackendCmdProcesses -Cell $Cell)
+    $backendCmdDescendants = @(Get-TestCellDescendantProcesses -RootProcessIds @($backendCmds | Select-Object -ExpandProperty ProcessId))
     $javaIds = New-Object 'System.Collections.Generic.HashSet[int]'
+    foreach ($proc in $backendCmdDescendants) {
+        if ($proc.Name -eq 'java.exe') {
+            $javaIds.Add([int]$proc.ProcessId) | Out-Null
+            if ($stopped.javaPids -notcontains $proc.ProcessId) {
+                $stopped.javaPids += $proc.ProcessId
+            }
+        }
+    }
+    $backendTree = Stop-TestCellProcessTree -RootProcesses $backendCmds
+    $stopped.cmdPids = @($stopped.cmdPids + @($backendTree.rootPids) | Select-Object -Unique)
+
     foreach ($port in @($Cell.serverPort, $Cell.pluginHttpPort)) {
         $listener = Get-ListeningPort -Port $port
         if ($null -ne $listener) {
@@ -302,10 +368,73 @@ function Stop-BackendServer {
 
     foreach ($javaId in @($javaIds)) {
         Stop-Process -Id $javaId -Force -ErrorAction SilentlyContinue
-        $stopped.javaPids += $javaId
+        if ($stopped.javaPids -notcontains $javaId) {
+            $stopped.javaPids += $javaId
+        }
     }
 
     return [pscustomobject]$stopped
+}
+
+function Wait-ForProcessExit {
+    param(
+        [int[]]$ProcessIds,
+        [int]$TimeoutSec = 20
+    )
+
+    $ids = @($ProcessIds | Where-Object { $_ } | Select-Object -Unique)
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while ((Get-Date) -lt $deadline) {
+        $running = @($ids | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
+        if ($running.Count -eq 0) {
+            return [pscustomobject]@{
+                exited = $true
+                remaining = @()
+            }
+        }
+        Start-Sleep -Milliseconds 500
+    }
+
+    return [pscustomobject]@{
+        exited = $false
+        remaining = @($ids | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
+    }
+}
+
+function Remove-FileWithRetry {
+    param(
+        [string]$Path,
+        [int]$Attempts = 12,
+        [int]$IntervalMs = 500
+    )
+
+    $lastError = $null
+    for ($i = 1; $i -le $Attempts; $i++) {
+        if (-not (Test-Path -LiteralPath $Path)) {
+            return [pscustomobject]@{
+                removed = $true
+                attempts = $i - 1
+                error = $null
+            }
+        }
+        try {
+            Remove-Item -LiteralPath $Path -Force
+            return [pscustomobject]@{
+                removed = $true
+                attempts = $i
+                error = $null
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+            Start-Sleep -Milliseconds $IntervalMs
+        }
+    }
+
+    return [pscustomobject]@{
+        removed = (-not (Test-Path -LiteralPath $Path))
+        attempts = $Attempts
+        error = $lastError
+    }
 }
 
 function Start-BackendServer {
@@ -317,10 +446,12 @@ function Start-BackendServer {
         '@echo off'
         ('cd /d "{0}"' -f $Cell.serverDir)
         ('title BC-Backend-{0}' -f $Cell.id)
-        ('"{0}" -Xms{1}M -Xmx{2}M -XX:+UseG1GC -XX:+AggressiveOpts -XX:+UseCompressedOops -noverify -jar "{3}"' -f
+        ('"{0}" -Xms{1}M -Xmx{2}M -Dblackboxpro.testCellId={3} -Dblackboxpro.serverDir="{4}" -XX:+UseG1GC -XX:+AggressiveOpts -XX:+UseCompressedOops -noverify -jar "{5}"' -f
             $Cell.serverJava,
             $Cell.serverMinMemoryMb,
             $Cell.serverMaxMemoryMb,
+            $Cell.id,
+            $Cell.serverDir,
             $Cell.serverJar)
     ) -join "`r`n"
     [System.IO.File]::WriteAllText($launcherPath, $launcherContent + "`r`n", [System.Text.UTF8Encoding]::new($false))
@@ -357,7 +488,7 @@ function Get-BotProcess {
     return Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -eq 'javaw.exe' -and
-            $_.CommandLine -match [regex]::Escape($Cell.botVersionDir)
+            $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $Cell.botVersionDir)
         } |
         Select-Object -First 1
 }
@@ -469,26 +600,35 @@ function Start-Bot {
         '--width', '854'
     )
 
-    Start-Process -FilePath $Cell.botJava -ArgumentList $args -WorkingDirectory $Cell.botVersionDir | Out-Null
+    Start-Process -FilePath $Cell.botJava -ArgumentList $args -WorkingDirectory $Cell.botVersionDir -WindowStyle (Get-TestCellClientWindowStyle -ShowClient:$ShowClient) | Out-Null
     $ready = Wait-Until -TimeoutSec 180 -Condition { Get-ListeningPort -Port $Cell.modHttpPort }
     return [bool]$ready
 }
 
 try {
     $backendCellIdsArg = (@($backendCells | ForEach-Object { $_.id }) -join ',')
-    $prepare = Invoke-ExternalJsonScript -ScriptPath (Join-Path $PSScriptRoot 'Prepare-TestCellBcBackends.ps1') -Arguments (
-        @(
-            '-Mode', 'prepare',
-            '-CellConfigPath', $cellConfig.path,
-            '-BotCellId', $botCell.id,
-            '-BackendCellIds', $backendCellIdsArg
-        ) + @(
-            '-Owner', $Owner
+    if ($SkipPrepare) {
+        $result.steps.prepare = [ordered]@{
+            skipped = $true
+            reason = 'SkipPrepare'
+            owner = $Owner
+            backendCellIds = @($backendCells | ForEach-Object { $_.id })
+        }
+    } else {
+        $prepare = Invoke-ExternalJsonScript -ScriptPath (Join-Path $PSScriptRoot 'Prepare-TestCellBcBackends.ps1') -Arguments (
+            @(
+                '-Mode', 'prepare',
+                '-CellConfigPath', $cellConfig.path,
+                '-BotCellId', $botCell.id,
+                '-BackendCellIds', $backendCellIdsArg
+            ) + @(
+                '-Owner', $Owner
+            )
         )
-    )
-    $result.steps.prepare = $prepare.json
-    if ($prepare.exitCode -ne 0 -or -not $prepare.json.ok) {
-        throw 'Prepare-TestCellBcBackends prepare failed.'
+        $result.steps.prepare = $prepare.json
+        if ($prepare.exitCode -ne 0 -or -not $prepare.json.ok) {
+            throw 'Prepare-TestCellBcBackends prepare failed.'
+        }
     }
 
     $helper = Invoke-ExternalJsonScript -ScriptPath (Join-Path $PSScriptRoot 'Build-TestCellBcBridgeHelper.ps1') -Arguments @()
@@ -564,6 +704,9 @@ try {
     }
 
     $currentBackend = $defaultBackend
+    if ($targetBackends.Count -gt 0) {
+        Invoke-TransferHook -Phase 'before-transfer' -ScriptPath $BeforeTransferHookScript -SourceCell $currentBackend -TargetCell $targetBackends[0] -BotCell $botCell | Out-Null
+    }
     foreach ($nextBackend in $targetBackends) {
         $crossServerCommand = Expand-CrossServerCommand -Template $CrossServerCommandTemplate -SourceCell $currentBackend -TargetCell $nextBackend -BotCell $botCell
         $cross = Invoke-PluginAction -Cell $currentBackend -Action 'chat_command' -Params @{
@@ -604,6 +747,7 @@ try {
             throw "Bot did not reach target backend $($nextBackend.id) through BC."
         }
 
+        Invoke-TransferHook -Phase 'after-transfer' -ScriptPath $AfterTransferHookScript -SourceCell $currentBackend -TargetCell $nextBackend -BotCell $botCell | Out-Null
         $currentBackend = $nextBackend
     }
 
@@ -617,13 +761,23 @@ finally {
     $result.steps.cleanup.bcStop = (Invoke-ExternalJsonScript -ScriptPath (Join-Path $PSScriptRoot 'Invoke-TestCellBc.ps1') -Arguments @('-Mode', 'stop', '-ConfigPath', $bcConfig.path)).json
     Stop-Bot -Cell $botCell
 
-    $restore = Invoke-ExternalJsonScript -ScriptPath (Join-Path $PSScriptRoot 'Prepare-TestCellBcBackends.ps1') -Arguments @(
-        '-Mode', 'restore',
-        '-CellConfigPath', $cellConfig.path,
-        '-Owner', $Owner
-    )
-    $result.steps.cleanup.restore = $restore.json
+    if ($SkipRestore) {
+        $result.steps.cleanup.restore = [ordered]@{
+            skipped = $true
+            reason = 'SkipRestore'
+            owner = $Owner
+        }
+    } else {
+        $restore = Invoke-ExternalJsonScript -ScriptPath (Join-Path $PSScriptRoot 'Prepare-TestCellBcBackends.ps1') -Arguments @(
+            '-Mode', 'restore',
+            '-CellConfigPath', $cellConfig.path,
+            '-Owner', $Owner
+        )
+        $result.steps.cleanup.restore = $restore.json
+    }
     $result.steps.cleanup.backendStop = @($backendCells | ForEach-Object { Stop-BackendServer -Cell $_ })
+    $stoppedProcessIds = @($result.steps.cleanup.backendStop | ForEach-Object { @($_.cmdPids) + @($_.javaPids) })
+    $result.steps.cleanup.backendProcessesExited = Wait-ForProcessExit -ProcessIds $stoppedProcessIds -TimeoutSec 20
     $result.steps.cleanup.launcherRemoved = @()
     foreach ($cell in $backendCells) {
         $launcherPath = Join-Path $cell.serverDir "start-bc-backend-$($cell.id).cmd"
@@ -634,15 +788,23 @@ finally {
     }
 
     $result.steps.cleanup.helperRemoved = @()
+    $result.steps.cleanup.helperRemoveAttempts = @()
     foreach ($cell in $backendCells) {
         $helperTarget = Join-Path (Join-Path $cell.serverDir 'plugins') 'TestCellBcBridgeHelper.jar'
         if (Test-Path -LiteralPath $helperTarget) {
-            try {
-                Remove-Item -LiteralPath $helperTarget -Force
+            $removeResult = Remove-FileWithRetry -Path $helperTarget
+            $result.steps.cleanup.helperRemoveAttempts += [ordered]@{
+                cellId = $cell.id
+                path = $helperTarget
+                removed = $removeResult.removed
+                attempts = $removeResult.attempts
+                error = $removeResult.error
+            }
+            if ($removeResult.removed) {
                 $result.steps.cleanup.helperRemoved += $helperTarget
-            } catch {
-                Add-Error ("Failed to remove helper jar: " + $_.Exception.Message)
-                $result.steps.cleanup.helperRemoveError = $_.Exception.Message
+            } else {
+                Add-Error ("Failed to remove helper jar: " + $removeResult.error)
+                $result.steps.cleanup.helperRemoveError = $removeResult.error
                 $result.ok = $false
             }
         }

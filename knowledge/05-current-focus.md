@@ -5,10 +5,34 @@
 - 当前代码真实主链是 HTTP 中继，不是服务端 Plugin Message Channel。
 - README、AGENTS 和部分旧开发文档仍保留旧架构描述，阅读时必须带着“历史背景文档”的心态。
 - 如果后续有人要继续开发 transport、测试框架或构建脚本，先看代码，再看旧文档。
-- 本地 test-cell 现在分成两套池：
-  - `1.12.2` 仍用 `cell-01..05`
+- 当前默认测试心智模型已经变了：
+  - `1.12.2` 的 `cell-01..05` 是统一的 Germ + BC 后端回归池，不再只把 `cell-04/05` 当特殊 Germ 机位
   - Forge `1.20.1` 独立用 `cell-06..08` + `cells-1201.json` + 专用 `Invoke/Provision/Sync/Stop` 脚本
-- Forge `1.20.1` 客户端路线已经切到“精简 mod”模式，默认只保留 `BlackBoxPro` 客户端模组，不再沿用整合包第三方 mod 列表。
+  - Forge `1.20.1` 客户端路线已经切到“精简 mod”模式，默认只保留 `BlackBoxPro` 客户端模组，不再沿用整合包第三方 mod 列表
+- 当前 `BlackBoxPro` 已经从“主要操作原版容器槽位”推进到“可对任意屏幕执行坐标级鼠标移动、点击和状态查询”的阶段，但这不等于 Germ 页面已经全部稳定可点。
+
+## 当前最该先记住的新事实
+
+- 1.12.2 Forge 已新增通用屏幕鼠标层：
+  - `move_mouse`
+  - `click_mouse`
+  - `click_screen_at`
+  - `query_cursor_state`
+- `query_cursor_state`、`move_mouse`、`click_screen_at` 已在本地真实环境完成基础验证；其中 `click_screen_at` 在原版 `GuiInventory` 已验证生效，但在真实 Germ 页面上仍需继续确认事件消费链路。
+- `cell-01..05` 当前都应保持：
+  - 服务端插件基线包含 `BlackBoxPro-Plugin`、`PlayerCurrency`、`PlayerPoints`、`LuckPerms`、`GermPlugin`、`Vault`、`PlaceholderAPI`、`ProtocolLib`
+  - bot mod 基线包含 `GermMod`
+  - bot `resourcepacks/` 包含并默认启用 `Minecraft-Mod-Language-Modpack.zip`
+- 受管测试服务端端口必须全局唯一，且不使用 `25565` / `25566`；当前 `cell-01` 端口为 `25570`。
+- 1.12.2 测试服务端默认超平坦：`level-type=FLAT`、`generator-settings=`，旧 `world/` 已归档后才会生成新超平坦世界。
+- 1.12.2 BC smoke 已支持 5 后端链路：
+  - `cell-02 -> cell-01 -> cell-03 -> cell-04 -> cell-05`
+  - cleanup 需要 stop BC、stop bot、restore 后端配置、release lease、删除 helper jar 和临时 launcher
+- 后续做 BC/多后端联调时，bot 连接代理必须使用 `localhost:25645`，不要用 `127.0.0.1:25645`。
+- Forge 1.12.2 模组专测已扩展为独立 `cell-20..22` 池：
+  - 服务端从 `cell-01` 的 CatServer 模板复制
+  - 客户端从 `cell-01` 的 1.12.2 bot 模板复制
+  - 配置文件固定为 `scripts/test-cells/cells-mod1122.json`
 
 ## 已确认的现状差异
 
@@ -54,6 +78,7 @@
 ## 当前建议的工作假设
 
 - 改 transport 时，默认以 HTTP 链路为当前生产链路。
-- 改 action 时，默认先同步 `1.21.11`，再判断 `1.21.1` 和 `1.12.2` 是否需要跟进。
-- 改测试时，优先看 `BlackBoxTestCatalog.kt` 和 `BlackBoxTestRunner.kt`，再参考 `docs/testing/`。
+- 改 action 时，默认先区分“是否需要同步 1.12.2 Germ / 屏幕鼠标层”；如果只是现代端能力，再判断 `1.21.11` 与 `1.21.1` 是否需要同时跟进。
+- 改测试时，优先看 `knowledge/03-build-and-verify.md`、`knowledge/06-test-system.md`、`BlackBoxTestCatalog.kt` 和 `BlackBoxTestRunner.kt`，再参考 `docs/testing/`。
 - 改构建说明时，以 `build.gradle.kts` 和各模块 `build.gradle.kts` 为准，不直接抄 README。
+- 做 1.12.2 Germ 自动化时，默认先假设“屏幕鼠标层已经可用，但 Germ 组件级命中仍可能需要专用 probe / hook”，不要把 `click_screen_at` 的基础成功误读成“所有 Germ GUI 都已收口”。

@@ -2,12 +2,12 @@
 
 ## 项目概述
 
-BlackBoxPro 是一个 Minecraft 自动化黑盒测试框架，通过 Plugin Message Channel 实现服务端→客户端的指令下发与结果回报。服务端插件向客户端 Mod 发送 JSON 指令，Mod 在客户端模拟真实玩家行为（移动、交互、GUI 操作、战斗等），用于对服务端插件逻辑进行自动化功能测试。
+BlackBoxPro 是一个 Minecraft 自动化黑盒测试框架。当前真实生产链路已经收口为 HTTP 中继：服务端插件与外部工具通过 HTTP 调用客户端 Mod 执行动作、截图和查询；Plugin Message Channel 相关描述主要是历史架构背景，阅读旧文档时需要特别留意。
 
 - 语言：Kotlin，JVM 21（1.21.11 模块）/ JVM 8（1.12.2 模块），`-Xjvm-default=all`
 - 构建工具：Gradle (Kotlin DSL)，多模块项目
 - 包根路径：`com.blackboxpro`
-- Minecraft 版本：1.21.11、1.12.2（多版本架构，模块名含 MC 版本号）
+- Minecraft 版本：1.21.11、1.21.1、1.12.2（多版本架构，模块名含 MC 版本号）
 
 ## 项目结构
 
@@ -17,6 +17,10 @@ BlackBoxPro/                    # 根聚合项目
 ├── mod/                        # 客户端相关独立 Gradle 工程
 │   ├── 1.21.11/
 │   │   ├── runtime/            # 1.21.11 公共运行时核心（共享桥接 + 当前 NeoForge MC 实现）
+│   │   ├── fabric/             # Fabric wrapper + 平台实现
+│   │   └── neoforge/           # NeoForge wrapper + 平台实现
+│   ├── 1.21.1/
+│   │   ├── runtime/            # 1.21.1 公共运行时核心
 │   │   ├── fabric/             # Fabric wrapper + 平台实现
 │   │   └── neoforge/           # NeoForge wrapper + 平台实现
 │   └── 1.12.2/                 # Forge 1.12.2 独立构建根
@@ -54,18 +58,15 @@ BlackBoxPro/                    # 根聚合项目
 ## 通讯架构
 
 ```
-┌─────────────────────┐     blackbox:command      ┌─────────────────────┐
-│   Bukkit Server     │ ────────────────────────▶  │  Fabric/NeoForge Mod │
-│   (plugin 模块)     │                            │  (客户端执行端)      │
-│                     │ ◀────────────────────────  │                     │
-│                     │     blackbox:response      │                     │
-└─────────────────────┘                            └─────────────────────┘
+┌─────────────────────┐      HTTP /execute        ┌─────────────────────┐
+│   Bukkit Server     │ ────────────────────────▶ │  Fabric/NeoForge Mod│
+│   (plugin 模块)     │                           │  / Forge 客户端执行端│
+│                     │ ◀──────────────────────── │                     │
+│                     │       HTTP /status        │                     │
+└─────────────────────┘                           └─────────────────────┘
 ```
 
-消息格式：JSON over Plugin Message Channel，VarInt(length) + UTF-8 bytes 编码。
-
-指令消息 (Server → Client)：`{ id, action, params, delay }`
-响应消息 (Client → Server)：`{ id, status, message, data }`
+当前默认按 HTTP 链路理解本仓库；Plugin Message Channel 只应视为旧设计背景，而不是当前代码事实。
 
 ## 技术栈
 
@@ -88,7 +89,7 @@ BlackBoxPro/                    # 根聚合项目
 - Log4j 日志（Forge 内置）
 - 独立 Gradle 项目（Groovy DSL），不在根 settings.gradle.kts 中
 - 网络层使用 FMLEventChannel + CPacketCustomPayload
-- 功能为 1.21.11 版本的最大兼容子集（约 80+ 个 Action）
+- 功能为现代端的最大兼容子集；动作数量会漂移，精确口径以 `ActionCatalog.kt` 或运行时 `/status` 为准
 
 ### 服务端插件 (plugin)
 
@@ -122,9 +123,9 @@ com.blackboxpro.{fabric|neoforge|forge}
 ```
 
 核心流程：
-1. `NetworkHandler` 注册 `blackbox:command` / `blackbox:response` 通道
-2. 收到指令 → `CommandDispatcher` 解析 JSON → 查找 `ActionRegistry` → 调度到主线程执行
-3. `ActionExecutor.execute()` 执行具体行为 → 通过 response 通道回报结果
+1. HTTP 入口接收 `/execute` 请求
+2. `CommandDispatcher` 解析 JSON → 查找 `ActionRegistry` → 调度到主线程执行
+3. `ActionExecutor.execute()` 执行具体行为 → 通过 HTTP 响应返回结果
 4. 复合行为通过 `TickScheduler` 跨 tick 调度
 
 ### ActionExecutor 接口
@@ -142,11 +143,7 @@ com.blackboxpro.plugin
 │       ├── ChatActions, ClientActions, CompositeActions, NavigationActions
 │       ├── QueryActions, ScreenshotActions
 │       └── HighLevelActions  # 面向场景的语义化高级 API
-├── channel/             # Plugin Message 通讯层
-│   ├── ChannelHandler   # 发送/接收/回调管理（@Awake 自动注册）
-│   ├── BlackBoxChannels # Channel ID 常量
-│   ├── CommandMessage    # 指令消息模型
-│   └── ResponseMessage   # 响应消息模型
+├── api/http/            # 当前 HTTP API 与 relay 边界
 ├── command/             # 命令系统
 │   ├── BlackBoxCommand  # /blackbox send|exec|test|status|reload（@CommandHeader）
 │   ├── BlackBoxTestRunner # 集成测试执行器（截图 + 三阶段验证）
@@ -196,8 +193,8 @@ com.blackboxpro.plugin
 ### 本地构建
 
 ```powershell
-# 构建 1.21.11 mod（common + runtime + fabric + neoforge）
-.\gradlew mod_buildAll
+# 全量构建并收集到根 build\libs
+.\gradlew buildAll
 
 # 构建服务端插件
 .\gradlew plugin_build
@@ -205,9 +202,18 @@ com.blackboxpro.plugin
 # 构建 Forge 1.12.2 Mod
 .\gradlew forge1122_build
 
-# 全量构建并收集到根 build\libs
-.\gradlew buildAll
+# 构建 Forge 1.20.1
+.\gradlew forge1201_build
+
+# 如需单独跑客户端聚合
+.\gradlew -p mod buildAll
 ```
+
+- 根 `build.gradle.kts` 当前没有 `mod_buildAll` 任务。
+- 1.12.2 本地回归的默认事实源优先看：
+  - `knowledge/03-build-and-verify.md`
+  - `knowledge/05-current-focus.md`
+  - `knowledge/06-test-system.md`
 
 ### 产物路径
 

@@ -151,7 +151,9 @@
 
 ## 运行时端口
 
-- `cell-01`：`25565 / 38080 / 38081`
+受管测试服务端端口必须全局唯一，且不使用 `25565` / `25566`。
+
+- `cell-01`：`25570 / 38080 / 38081`
 - `cell-02`：`25575 / 38090 / 38091`
 - `cell-03`：`25585 / 38100 / 38101`
 - `cell-04`：`25595 / 38110 / 38111`
@@ -162,7 +164,11 @@
 
 ## 最短验证路径
 
-1.12.2 的 `cell-01..05` 都应保持 Germ 可用，服务端 `plugins/` 里有 `GermPlugin`，bot `mods/` 里有 `GermMod`。如发现漂移，先执行 `scripts/test-cells/Sync-TestCellBaselinePlugins.ps1 -DryRun` 查看差异，再执行同步脚本修正。
+1.12.2 的 `cell-01..05` 都应保持 Germ 可用，服务端公共基线包含 `BlackBoxPro-Plugin`、`PlayerCurrency`、`PlayerPoints`、`LuckPerms`、`GermPlugin`、`Vault`、`PlaceholderAPI`、`ProtocolLib`，bot `mods/` 里有 `GermMod`。如发现漂移，先执行 `scripts/test-cells/Sync-TestCellBaselinePlugins.ps1 -DryRun` 查看差异，再执行同步脚本修正。
+
+1.12.2 测试服务端默认超平坦：`server.properties` 应保持 `level-type=FLAT`、`generator-settings=`。如果已有旧 `world/`，先归档旧目录再启动，否则 Minecraft 会继续使用旧世界。
+
+1.20.1 的 `cell-06..08` 使用独立 baseline，服务端公共基线包含 `BlackBoxPro-Plugin`、`PlayerCurrency`、`LuckPerms`。如发现漂移，先执行 `scripts/test-cells/Sync-TestCellBaselinePlugins1201.ps1 -DryRun` 查看差异，再执行同步脚本修正。
 
 ### 单个 cell
 
