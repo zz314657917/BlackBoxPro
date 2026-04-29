@@ -140,6 +140,7 @@ if (-not (Test-Path -LiteralPath $sourcePluginsDir)) {
     throw "Source plugins dir not found: $sourcePluginsDir. The repo may still be using sample paths in $($config.path); update the local test-cell config first."
 }
 $sourceModsDir = Join-Path $sourceCell.botVersionDir 'mods'
+$sourceResourcePacksDir = Join-Path $sourceCell.botVersionDir 'resourcepacks'
 
 $sourceBaselinePlugins = @(Get-TestCellBaselinePluginFiles -PluginsDir $sourcePluginsDir -BaselineConfig $baseline)
 if ($sourceBaselinePlugins.Count -eq 0) {
@@ -162,6 +163,17 @@ if ((Get-TestCellBaselineBotModPatterns -BaselineConfig $baseline).Count -gt 0) 
     }
 }
 
+$sourceBaselineBotResourcePacks = @()
+if ((Get-TestCellBaselineBotResourcePackPatterns -BaselineConfig $baseline).Count -gt 0) {
+    if (-not (Test-Path -LiteralPath $sourceResourcePacksDir)) {
+        throw "Source bot resourcepacks dir not found: $sourceResourcePacksDir"
+    }
+    $sourceBaselineBotResourcePacks = @(Get-TestCellBaselineBotResourcePackFiles -ResourcePacksDir $sourceResourcePacksDir -BaselineConfig $baseline)
+    if ($sourceBaselineBotResourcePacks.Count -eq 0) {
+        throw "No baseline bot resourcepacks matched in source resourcepacks dir: $sourceResourcePacksDir for baseline $($baseline.id)"
+    }
+}
+
 $summaries = New-Object System.Collections.Generic.List[object]
 
 foreach ($targetId in $TargetCellIds) {
@@ -175,6 +187,7 @@ foreach ($targetId in $TargetCellIds) {
 
     $pluginsDir = Join-Path $targetCell.serverDir 'plugins'
     $modsDir = Join-Path $targetCell.botVersionDir 'mods'
+    $resourcePacksDir = Join-Path $targetCell.botVersionDir 'resourcepacks'
     $disabledDir = Join-Path $pluginsDir '_disabled-by-codex'
     $removedFromPlugins = New-Object System.Collections.Generic.List[string]
     $removedFromDisabled = New-Object System.Collections.Generic.List[string]
@@ -189,6 +202,15 @@ foreach ($targetId in $TargetCellIds) {
         skipped = @()
         removed = @()
     }
+    $botResourcePacks = [pscustomobject]@{
+        resourcePacksDir = $resourcePacksDir
+        exists = $false
+        copied = @()
+        updated = @()
+        skipped = @()
+        removed = @()
+    }
+    $botResourcePackOptions = $null
 
     if (-not (Test-Path -LiteralPath $pluginsDir)) {
         $summaries.Add([pscustomobject]@{
@@ -249,6 +271,33 @@ foreach ($targetId in $TargetCellIds) {
         }
     }
 
+    if ($sourceBaselineBotResourcePacks.Count -gt 0) {
+        if (-not (Test-Path -LiteralPath $resourcePacksDir)) {
+            if (-not $DryRun.IsPresent) {
+                New-Item -ItemType Directory -Path $resourcePacksDir -Force | Out-Null
+            }
+        }
+
+        $botResourcePackSync = Sync-BaselineFilesToTarget -SourceFiles $sourceBaselineBotResourcePacks -TargetDir $resourcePacksDir -BaselineConfig $baseline -GetTargetBaselineFiles {
+            param($TargetDir, $BaselineConfig)
+            Get-TestCellBaselineBotResourcePackFiles -ResourcePacksDir $TargetDir -BaselineConfig $BaselineConfig
+        } -DryRunMode $DryRun.IsPresent
+
+        $botResourcePacks = [pscustomobject]@{
+            resourcePacksDir = $resourcePacksDir
+            exists = $true
+            copied = @($botResourcePackSync.copied)
+            updated = @($botResourcePackSync.updated)
+            skipped = @($botResourcePackSync.skipped)
+            removed = @($botResourcePackSync.removed)
+        }
+    }
+
+    $defaultResourcePacks = @(Get-TestCellBaselineBotDefaultResourcePacks -BaselineConfig $baseline)
+    if ($defaultResourcePacks.Count -gt 0) {
+        $botResourcePackOptions = Set-TestCellBotDefaultResourcePacks -BotVersionDir $targetCell.botVersionDir -ResourcePackNames $defaultResourcePacks -DryRun:$DryRun
+    }
+
     $summaries.Add([pscustomobject]@{
             cellId = $targetCell.id
             pluginsDir = $pluginsDir
@@ -259,7 +308,15 @@ foreach ($targetId in $TargetCellIds) {
             removedFromPlugins = $removedFromPlugins.ToArray()
             removedFromDisabled = $removedFromDisabled.ToArray()
             botMods = $botMods
+            botResourcePacks = $botResourcePacks
+            botResourcePackOptions = $botResourcePackOptions
         }) | Out-Null
+}
+
+$sourceBotResourcePackOptions = $null
+$defaultSourceResourcePacks = @(Get-TestCellBaselineBotDefaultResourcePacks -BaselineConfig $baseline)
+if ($defaultSourceResourcePacks.Count -gt 0) {
+    $sourceBotResourcePackOptions = Set-TestCellBotDefaultResourcePacks -BotVersionDir $sourceCell.botVersionDir -ResourcePackNames $defaultSourceResourcePacks -DryRun:$DryRun
 }
 
 [pscustomobject]@{
@@ -272,9 +329,14 @@ foreach ($targetId in $TargetCellIds) {
     baselineSourceCellId = $sourceCell.id
     baselineSourcePluginsDir = $sourcePluginsDir
     baselineSourceModsDir = $sourceModsDir
+    baselineSourceResourcePacksDir = $sourceResourcePacksDir
     baselinePatterns = (Get-TestCellBaselinePluginPatterns -BaselineConfig $baseline)
     baselineBotModPatterns = (Get-TestCellBaselineBotModPatterns -BaselineConfig $baseline)
+    baselineBotResourcePackPatterns = (Get-TestCellBaselineBotResourcePackPatterns -BaselineConfig $baseline)
+    baselineBotDefaultResourcePacks = (Get-TestCellBaselineBotDefaultResourcePacks -BaselineConfig $baseline)
     baselinePluginNames = @($sourceBaselinePlugins | ForEach-Object { $_.Name })
     baselineBotModNames = @($sourceBaselineBotMods | ForEach-Object { $_.Name })
+    baselineBotResourcePackNames = @($sourceBaselineBotResourcePacks | ForEach-Object { $_.Name })
+    baselineSourceBotResourcePackOptions = $sourceBotResourcePackOptions
     targets = $summaries.ToArray()
 } | ConvertTo-Json -Depth 12

@@ -1,8 +1,10 @@
 param(
-    [ValidateSet('smoke', 'full')]
-    [string]$Scope = 'smoke',
-    [string]$CellId = '',
+    [ValidateSet('startup', 'smoke')]
+    [string]$Scope = 'startup',
+    [string]$CellId = 'cell-20',
     [string]$ConfigPath = '',
+    [string[]]$ModJar = @(),
+    [string[]]$RemoveExistingPattern = @(),
     [switch]$AcquireCell,
     [int]$WaitSeconds = 60,
     [int]$LeaseMinutes = 120,
@@ -13,17 +15,22 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+$explicitCellId = $PSBoundParameters.ContainsKey('CellId')
 
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
-    $ConfigPath = Join-Path $PSScriptRoot 'cells.json'
+    $ConfigPath = Join-Path $PSScriptRoot 'cells-mod1122.json'
 }
 if ([string]::IsNullOrWhiteSpace($LeaseOwner)) {
-    $LeaseOwner = "bbp-regression-$Scope-$PID"
+    $LeaseOwner = "bbp-mod1122-$Scope-$PID"
+}
+if ($AcquireCell -and -not $explicitCellId) {
+    $CellId = ''
 }
 
 . (Join-Path $PSScriptRoot 'TestCellCommon.ps1')
 
 $invokeScriptPath = Join-Path $PSScriptRoot 'Invoke-TestCell.ps1'
+$syncScriptPath = Join-Path $PSScriptRoot 'Sync-TestCellMod1122Artifacts.ps1'
 $config = Load-TestCellConfig -ConfigPath $ConfigPath
 $acquiredLease = $null
 
@@ -33,8 +40,6 @@ if ($AcquireCell -or [string]::IsNullOrWhiteSpace($CellId)) {
 } else {
     $cell = Get-TestCell -Config $config -CellId $CellId
 }
-
-$pluginExecuteUrl = "http://127.0.0.1:$($cell.pluginHttpPort)/execute"
 
 $result = [ordered]@{
     scope = $Scope
@@ -47,8 +52,8 @@ $result = [ordered]@{
     startedAt = (Get-Date).ToString('s')
     steps = [ordered]@{
         acquire = $null
-        ensure = $null
-        test = $null
+        sync = $null
+        invoke = $null
         cleanup = $null
     }
     errors = New-Object System.Collections.Generic.List[string]
@@ -101,45 +106,6 @@ function Invoke-JsonScript {
     }
 }
 
-function Invoke-JsonRequest {
-    param(
-        [string]$Uri,
-        [object]$Body,
-        [int]$TimeoutSec = 1800
-    )
-
-    try {
-        $jsonBody = if ($Body -is [string]) { $Body } else { $Body | ConvertTo-Json -Compress -Depth 20 }
-        $content = Invoke-WebRequest -Uri $Uri -Method Post -UseBasicParsing -TimeoutSec $TimeoutSec -ContentType 'application/json; charset=utf-8' -Body $jsonBody |
-            Select-Object -ExpandProperty Content
-        return [ordered]@{
-            ok = $true
-            content = $content
-            json = if ($content) { $content | ConvertFrom-Json } else { $null }
-        }
-    } catch {
-        return [ordered]@{
-            ok = $false
-            error = $_.Exception.Message
-            content = $null
-            json = $null
-        }
-    }
-}
-
-function Invoke-RunTest {
-    $request = [ordered]@{
-        id = "cell-$Scope-$($cell.id)-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
-        action = 'run_test'
-        params = [ordered]@{
-            player = $cell.botPlayer
-            scope = $Scope
-        }
-    }
-
-    return Invoke-JsonRequest -Uri $pluginExecuteUrl -Body $request -TimeoutSec 1800
-}
-
 function Cleanup-Cell {
     $cleanup = [ordered]@{
         stop = $null
@@ -171,24 +137,32 @@ function Cleanup-Cell {
 }
 
 try {
-    $ensure = Invoke-JsonScript -ScriptPath $invokeScriptPath -Arguments @{
-        Mode = 'ensure'
+    if ($ModJar.Count -gt 0) {
+        $syncArgs = @{
+            ConfigPath = $ConfigPath
+            CellIds = @($cell.id)
+            ModJar = $ModJar
+        }
+        if ($RemoveExistingPattern.Count -gt 0) {
+            $syncArgs.RemoveExistingPattern = $RemoveExistingPattern
+        }
+        $sync = Invoke-JsonScript -ScriptPath $syncScriptPath -Arguments $syncArgs
+        $result.steps.sync = $sync
+        if (-not $sync.ok) {
+            throw "Artifact sync failed for $($cell.id)."
+        }
+    }
+
+    $mode = if ($Scope -eq 'smoke') { 'smoke' } else { 'ensure' }
+    $invoke = Invoke-JsonScript -ScriptPath $invokeScriptPath -Arguments @{
+        Mode = $mode
         CellId = $cell.id
         ConfigPath = $ConfigPath
         ShowClient = [bool]$ShowClient
     }
-    $result.steps.ensure = $ensure
-    if (-not $ensure.ok) {
-        throw "Ensure failed for $($cell.id)."
-    }
-
-    $test = Invoke-RunTest
-    $result.steps.test = $test
-    if (-not $test.ok) {
-        throw "run_test request failed for $($cell.id): $($test.error)"
-    }
-    if (-not $test.json -or $test.json.status -ne 'success') {
-        throw "run_test did not return success JSON for $($cell.id)."
+    $result.steps.invoke = $invoke
+    if (-not $invoke.ok) {
+        throw "$mode failed for $($cell.id)."
     }
 
     $result.ok = $true

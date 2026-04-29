@@ -4,7 +4,8 @@ param(
     [string]$CellId,
     [string]$ConfigPath = '',
     [switch]$NoAutoStartServer,
-    [switch]$NoAutoStartBot
+    [switch]$NoAutoStartBot,
+    [switch]$ShowClient
 )
 
 $ErrorActionPreference = 'Stop'
@@ -220,7 +221,7 @@ function Get-ServerProcess {
     return Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -eq 'java.exe' -and
-            $_.CommandLine -match [regex]::Escape($cell.serverDir)
+            $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $cell.serverDir)
         } |
         Select-Object -First 1
 }
@@ -229,7 +230,7 @@ function Get-ServerControllerProcesses {
     @(Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -in @('cmd.exe', 'powershell.exe') -and
-            $_.CommandLine -match [regex]::Escape($cell.serverDir)
+            $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $cell.serverDir)
         })
 }
 
@@ -245,7 +246,7 @@ function Get-BotProcess {
     return Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -in @('javaw.exe', 'java.exe') -and
-            $_.CommandLine -match [regex]::Escape($cell.botVersionDir)
+            $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $cell.botVersionDir)
         } |
         Select-Object -First 1
 }
@@ -258,12 +259,20 @@ function Stop-CellProcesses {
         freedPorts = @{}
     }
 
-    foreach ($proc in @(Get-ServerControllerProcesses)) {
-        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
-        $stopped.serverControllerPids += $proc.ProcessId
-    }
-
+    $serverControllers = @(Get-ServerControllerProcesses)
+    $serverControllerDescendants = @(Get-TestCellDescendantProcesses -RootProcessIds @($serverControllers | Select-Object -ExpandProperty ProcessId))
     $serverJavaIds = New-Object System.Collections.Generic.HashSet[int]
+    foreach ($proc in $serverControllerDescendants) {
+        if ($proc.Name -eq 'java.exe') {
+            $serverJavaIds.Add([int]$proc.ProcessId) | Out-Null
+            if ($stopped.serverJavaPids -notcontains $proc.ProcessId) {
+                $stopped.serverJavaPids += $proc.ProcessId
+            }
+        }
+    }
+    $serverTree = Stop-TestCellProcessTree -RootProcesses $serverControllers
+    $stopped.serverControllerPids = @($stopped.serverControllerPids + @($serverTree.rootPids) | Select-Object -Unique)
+
     foreach ($proc in @(Get-ProcessesByIds -ProcessIds (Get-ListeningProcessIds -Ports @($cell.serverPort, $cell.pluginHttpPort)))) {
         if ($proc.Name -eq 'java.exe') {
             $serverJavaIds.Add([int]$proc.ProcessId) | Out-Null
@@ -272,13 +281,15 @@ function Stop-CellProcesses {
     foreach ($proc in @(Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -eq 'java.exe' -and
-            $_.CommandLine -match [regex]::Escape($cell.serverDir)
+            $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $cell.serverDir)
         })) {
         $serverJavaIds.Add([int]$proc.ProcessId) | Out-Null
     }
     foreach ($proc in @(Get-ProcessesByIds -ProcessIds @($serverJavaIds))) {
         Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
-        $stopped.serverJavaPids += $proc.ProcessId
+        if ($stopped.serverJavaPids -notcontains $proc.ProcessId) {
+            $stopped.serverJavaPids += $proc.ProcessId
+        }
     }
 
     $botJavaIds = New-Object System.Collections.Generic.HashSet[int]
@@ -290,7 +301,7 @@ function Stop-CellProcesses {
     foreach ($proc in @(Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -in @('javaw.exe', 'java.exe') -and
-            $_.CommandLine -match [regex]::Escape($cell.botVersionDir)
+            $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $cell.botVersionDir)
         })) {
         $botJavaIds.Add([int]$proc.ProcessId) | Out-Null
     }
@@ -323,7 +334,7 @@ function Stop-BotProcesses {
     foreach ($proc in @(Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -in @('javaw.exe', 'java.exe') -and
-            $_.CommandLine -match [regex]::Escape($cell.botVersionDir)
+            $_.CommandLine -match (Get-TestCellCommandLinePathPattern -Path $cell.botVersionDir)
         })) {
         $botJavaIds.Add([int]$proc.ProcessId) | Out-Null
     }
@@ -611,7 +622,7 @@ function Start-Bot {
     ) + @($gameArgs)
 
     $botJava = Resolve-JavaExecutablePath -ConfiguredPath $cell.botJava
-    Start-Process -FilePath $botJava -ArgumentList $args -WorkingDirectory $cell.botVersionDir | Out-Null
+    Start-Process -FilePath $botJava -ArgumentList $args -WorkingDirectory $cell.botVersionDir -WindowStyle (Get-TestCellClientWindowStyle -ShowClient:$ShowClient) | Out-Null
     return (Wait-ForPorts -Ports @($cell.modHttpPort) -TimeoutSec 180)
 }
 

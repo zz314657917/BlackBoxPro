@@ -6,13 +6,18 @@
 
 - 当前 1.12.2 本地回归统一走 `cell-01..05`。
 - `cell-01..05` 都应保持 Germ 可用：服务端公共基线包含 `GermPlugin`，bot 端公共 mod 基线包含 `GermMod`；不要再把 Germ 测试限定到 `cell-04/05`。
+- `cell-01..05` 的 1.12.2 bot 客户端基线还包含 JEI 核心 `辅助-jei.jar` 和资源包 `Minecraft-Mod-Language-Modpack.zip`；语言包不仅要复制到 `resourcepacks/`，还要写入 `options.txt` 的 `resourcePacks:["file/Minecraft-Mod-Language-Modpack.zip"]` 默认启用。
+- 所有 1.12.2 测试服务端统一使用超平坦世界：`level-type=FLAT`、`generator-settings=`；已有旧 `world/` 必须先归档或删除，配置才会在下次启动时生效。
 - 当前 Forge 1.20.1 本地回归走独立的 `cell-06..08`，配置文件固定为 `scripts/test-cells/cells-1201.json`，不混入原 `cells.json`。
+- 当前 Forge 1.12.2 模组专测走独立的 `cell-20..22`，配置文件固定为 `scripts/test-cells/cells-mod1122.json`，由 `cell-01` 复制服务端和客户端模板。
 - 服务端目录命名约定：
   - `cell-01..05` -> `server-cell-01..05`
   - `cell-06..08` -> `server-cell-1201-06..08`
+  - `cell-20..22` -> `server-cell-mod1122-20..22`
 - 客户端目录命名约定：
   - `cell-01..05` -> `cell-xx/.minecraft/versions/bot`
   - `cell-06..08` -> `cell-xx/.minecraft/versions/1.20.1-Forge_47.3.0`
+  - `cell-20..22` -> `cell-20..22/.minecraft/versions/bot`
 - 仓库内的 `cells.json` / `cells-1201.json` 只提交脱敏样例，真实根路径应由本地操作者自行填写。
 
 ### 客户端共享资源
@@ -30,8 +35,13 @@
 - `1.20.1` 池当前默认内存：
   - 服务端 `1G / 1G`
   - 客户端 `1G / 1G`
+- `1.12.2` 普通池和模组专测池当前默认服务端内存：
+  - 服务端 `512M / 1536M`
+  - 客户端 `512M / 1024M`
 
 ### 端口约定
+
+受管测试服务端端口必须全局唯一，且不使用 `25565` / `25566`。
 
 - `cell-01`：`25570 / 38080 / 38081`
 - `cell-02`：`25575 / 38090 / 38091`
@@ -41,6 +51,9 @@
 - `cell-06`：`25615 / 38130 / 38131`
 - `cell-07`：`25625 / 38140 / 38141`
 - `cell-08`：`25635 / 38150 / 38151`
+- `cell-20`：`25720 / 38200 / 38201`
+- `cell-21`：`25721 / 38210 / 38211`
+- `cell-22`：`25722 / 38220 / 38221`
 
 ### 与独立主测试服的边界
 
@@ -52,7 +65,19 @@
   - `Invoke-TestCell1201.ps1`
   - `Sync-TestCell1201Artifacts.ps1`
   - `Stop-AllTestCells1201.ps1`
-- `Get-TestCellStatus.ps1`、`Acquire-TestCell.ps1`、`Release-TestCell.ps1` 继续复用，但必须显式传 `-ConfigPath "scripts/test-cells/cells-1201.json"`。
+- `1.12.2` 模组专测使用单独配置和辅助脚本：
+  - `cells-mod1122.json`
+  - `Provision-TestCellMod1122.ps1`
+  - `Sync-TestCellMod1122Artifacts.ps1`
+  - `Run-TestCellMod1122Regression.ps1`
+  - `Set-TestCellBotResourcePacks.ps1`
+  - 启停仍复用 `Invoke-TestCell.ps1 -ConfigPath scripts/test-cells/cells-mod1122.json`
+- `Sync-TestCellBaselinePlugins.ps1` 会从 `cell-01` 同步 1.12.2 服务端插件、bot `mods/` 和 bot `resourcepacks/` 基线到 `cell-02..05`，并按 `baseline-1122.json` 的 `botDefaultResourcePacks` 写入默认加载项；1.12.2 服务端公共基线包含 `BlackBoxPro-Plugin`、`PlayerCurrency`、`PlayerPoints`、`LuckPerms`、`GermPlugin`、`Vault`、`PlaceholderAPI`、`ProtocolLib`。
+- `Sync-TestCellBaselinePlugins1201.ps1` 会从 `cell-06` 同步 1.20.1 服务端插件基线到 `cell-07..08`；1.20.1 服务端公共基线包含 `BlackBoxPro-Plugin`、`PlayerCurrency`、`LuckPerms`。
+- `Set-TestCellBotResourcePacks.ps1` 默认覆盖当前 1.12.2 受管客户端：`cell-01..05`、隔离 `cell-10`、`cell-20..22`；它会复制缺失的 `Minecraft-Mod-Language-Modpack.zip` 并更新 `options.txt`。
+- `Get-TestCellStatus.ps1`、`Acquire-TestCell.ps1`、`Release-TestCell.ps1` 继续复用，但独立池必须显式传对应配置：
+  - Forge 1.20.1：`-ConfigPath "scripts/test-cells/cells-1201.json"`
+  - Forge 1.12.2 模组专测：`-ConfigPath "scripts/test-cells/cells-mod1122.json"`
 
 ## 测试入口总览
 
@@ -119,13 +144,18 @@
   - 释放本次 owner 写下的 lease
 - `Run-TestCellBcSmoke.ps1` 当前仍使用临时 helper 插件 `bbswitch` 做跨服，因为 Waterfall 自带 `cmd_server` 模块下载链路在本机返回 `403`。
 - `Run-TestCellBcSmoke.ps1` 支持 `-BackendCellIds` 多后端 smoke；当前已验证 `cell-02 -> cell-01 -> cell-03 -> cell-04 -> cell-05`。
+- `Run-TestCellBcSmoke.ps1` 支持业务专项 hook：
+  - `-BeforeTransferHookScript <path>` 在首次跨服命令前执行
+  - `-AfterTransferHookScript <path>` 在每次目标 backend relay 成功后执行
+  - hook 脚本会收到 `-Phase`、`-PlayerName`、source/target cell id 和 source/target plugin/mod HTTP port
+  - 外部 wrapper 已经自行调用 `Prepare-TestCellBcBackends.ps1` 时，可配合 `-SkipPrepare -SkipRestore` 复用同一租约和 artifact 部署窗口
 - Bot 连接 BC 时使用 `localhost:25645`，不要使用 `127.0.0.1:25645`。
 - `Run-TestCellBcSmoke.ps1` 的 cleanup 必须完成：
   - stop BC
   - stop bot
   - restore 后端配置
   - release lease
-  - 删除 `TestCellBcBridgeHelper.jar`
+  - 删除 `TestCellBcBridgeHelper.jar`，若刚停服后文件仍被短暂占用，需要等待后端进程退出并重试
   - 删除临时 `start-bc-backend-*.cmd` launcher
 
 ## 两套测试流
@@ -253,6 +283,57 @@ catalog 流程最终会汇总：
    - 自动执行 `connect_to_server`
    - 若进入 `DisconnectedScreen` 且原因包含 `Server is still starting`，会先 `close_screen` 再自动重连
    - 最终以 `query_player_state` 成功作为 ready 判定
+
+## Forge 1.12.2 模组 cell-20..22 池流程
+
+`cell-20..22` 用于测试 Forge 1.12.2 模组，不混入普通 `cell-01..05` 插件回归池。它们复用 `cell-01` 的 CatServer 服务端和 1.12.2 bot 客户端模板，但有独立目录、端口和 lease。
+
+给已有 `cell-20` 追加准备 `cell-21/22`：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Provision-TestCellMod1122.ps1"
+```
+
+如需从空目录重建三格池，显式传入全部目标并加 `-Force`：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Provision-TestCellMod1122.ps1" -TargetCellIds cell-20,cell-21,cell-22 -Force
+```
+
+同步被测模组 jar 到服务端和客户端：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Sync-TestCellMod1122Artifacts.ps1" -ModJar "F:/mcplugins/mod/CloudStorage/build/libs/cloudstorage-0.1.0-SNAPSHOT.jar"
+```
+
+只做启动和联通验证：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Run-TestCellMod1122Regression.ps1" -Scope startup -ModJar "F:/mcplugins/mod/CloudStorage/build/libs/cloudstorage-0.1.0-SNAPSHOT.jar" -AcquireCell
+```
+
+保留现场给人工进游戏测 GUI：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Run-TestCellMod1122Regression.ps1" -Scope startup -ModJar "F:/mcplugins/mod/CloudStorage/build/libs/cloudstorage-0.1.0-SNAPSHOT.jar" -AcquireCell -KeepCell
+```
+
+收尾：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode stop -CellId <cell-id> -ConfigPath "scripts/test-cells/cells-mod1122.json"
+```
+
+`Sync-TestCellMod1122Artifacts.ps1` 默认同步到 `cell-20..22`，并按 jar 名推断旧版本清理模式，例如 `cloudstorage-0.1.0-SNAPSHOT.jar` 会清理两端 `cloudstorage-*.jar`，不会清掉 BlackBoxPro / GermMod 等基线 mod。
+
+## Client Visibility Policy
+
+- Automated regression scripts hide the Minecraft client by default: `Invoke-TestCell.ps1`, `Invoke-TestCell1201.ps1`, `Run-TestCellRegression.ps1`, `Run-TestCellMod1122Regression.ps1`, and `Run-TestCellBcSmoke.ps1`.
+- Pass `-ShowClient` only when visual debugging is needed.
+- Manual hand-test sessions pass `ShowClient=true` automatically, so the client window is visible to the operator.
+- Each current client root under `G:/MC/game/BlackBoxProTestCells/cell-*` has `Start-ManualTest.cmd` for double-click hand-testing. It calls `scripts/test-cells/Start-TestCellManualClient.ps1`, acquires the pinned cell, starts the matching server/client visibly, waits for Enter, then runs `stop + release`.
+- The launchers cover `cell-01..08`, isolated `cell-10`, and `cell-20..22`; `cell-10` uses a generated ignored runtime config under `scripts/test-cells/locks/manual-client/`.
+- `screenshot` / `screenshot_tooltip` capture the Minecraft framebuffer, not the Windows desktop. Hidden clients are acceptable for automation, but screenshot tests must still validate `filePath`, dimensions, file size, and the expected screen state.
 
 ## QQFarm 闭环验证现状
 

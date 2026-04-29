@@ -9,6 +9,7 @@
   ],
   "pluginPatterns": [
     "^BlackBoxPro-Plugin-.*\\.jar$",
-    "^PlayerCurrency.*\\.jar$"
+    "^PlayerCurrency.*\\.jar$",
+    "^LuckPerms.*\\.jar$"
   ]
 }

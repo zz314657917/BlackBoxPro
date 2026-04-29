@@ -52,6 +52,25 @@ function Minimize-BotMods {
         }
 }
 
+function Set-ServerPropertyLine {
+    param(
+        [string]$Content,
+        [string]$Key,
+        [string]$Value
+    )
+
+    $replacement = "$Key=$Value"
+    $pattern = "(?m)^$([regex]::Escape($Key))=.*$"
+    if ($Content -match $pattern) {
+        return [regex]::Replace($Content, $pattern, $replacement)
+    }
+
+    if (-not $Content.EndsWith("`n")) {
+        $Content += "`r`n"
+    }
+    return $Content + $replacement + "`r`n"
+}
+
 function Update-ServerConfig {
     param([object]$Cell)
 
@@ -74,10 +93,12 @@ function Update-ServerConfig {
     $serverPropertiesPath = Join-Path $Cell.serverDir 'server.properties'
     if (Test-Path -LiteralPath $serverPropertiesPath) {
         $serverContent = Get-Content -Raw -LiteralPath $serverPropertiesPath
-        $serverContent = [regex]::Replace($serverContent, '(?m)^server-port=\d+\s*$', "server-port=$($Cell.serverPort)")
-        $serverContent = [regex]::Replace($serverContent, '(?m)^motd=.*$', "motd=BlackBoxPro $($Cell.id)")
-        $serverContent = [regex]::Replace($serverContent, '(?m)^difficulty=.*$', 'difficulty=0')
-        $serverContent = [regex]::Replace($serverContent, '(?m)^spawn-monsters=.*$', 'spawn-monsters=false')
+        $serverContent = Set-ServerPropertyLine -Content $serverContent -Key 'server-port' -Value $Cell.serverPort
+        $serverContent = Set-ServerPropertyLine -Content $serverContent -Key 'motd' -Value "BlackBoxPro $($Cell.id)"
+        $serverContent = Set-ServerPropertyLine -Content $serverContent -Key 'difficulty' -Value '0'
+        $serverContent = Set-ServerPropertyLine -Content $serverContent -Key 'spawn-monsters' -Value 'false'
+        $serverContent = Set-ServerPropertyLine -Content $serverContent -Key 'level-type' -Value 'FLAT'
+        $serverContent = Set-ServerPropertyLine -Content $serverContent -Key 'generator-settings' -Value ''
         [System.IO.File]::WriteAllText($serverPropertiesPath, $serverContent, [System.Text.UTF8Encoding]::new($false))
     }
 }

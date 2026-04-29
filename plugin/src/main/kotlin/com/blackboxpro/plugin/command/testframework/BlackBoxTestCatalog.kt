@@ -474,8 +474,8 @@ object BlackBoxTestCatalog {
             addProperty("result", "accepted")
         }
         "connect_to_server" -> JsonObject().apply {
-            addProperty("ip", "127.0.0.1")
-            addProperty("port", 25565)
+            addProperty("ip", "localhost")
+            addProperty("port", 25570)
         }
         "move_mouse" -> JsonObject().apply {
             addProperty("x", 320.0)
