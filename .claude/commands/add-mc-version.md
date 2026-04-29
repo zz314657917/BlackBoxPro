@@ -16,10 +16,6 @@ allowed-tools: [Read, Bash]
 ## 执行步骤
 
 1. Read：`.claude/skills/add-mc-version/skill.md`，按文档流程执行。
-2. 可选自检：
-   ```bash
-   python .claude/skills/validate_blackboxpro_skills.py
-   ```
 
 ## 参数提示
 

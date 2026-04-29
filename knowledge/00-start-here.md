@@ -24,10 +24,11 @@ BlackBoxPro 是一个 Minecraft 自动化黑盒测试框架。服务端插件负
 
 - 根版本号当前是 `2.2.4`，来源于根目录 `gradle.properties`。
 - 动作 ID 和参数的唯一真源是 `common/src/main/kotlin/com/blackboxpro/common/action/ActionCatalog.kt`。
-- 当前 `ActionCatalog` 中登记了 `115` 个 action。
+- 当前 `ActionCatalog` 中登记了 `117` 个 action。
 - 现代端同时维护 `1.21.11` 与 `1.21.1` 两条客户端线，兼容线为 `1.12.2` Forge。
 - 服务端插件当前主链路是 `BlackBoxApi -> ModRelayClient -> Mod HTTP /execute`，不是旧文档里描述的 Plugin Message Channel 主链路。
 - 当前工作区根目录不是 Git 仓库根，不能默认依赖 `git status`、`git diff` 做上下文判断。
+- 当前 1.12.2 本地回归默认只走 `scripts/test-cells/`；`cell-01..05` 对应受管 `server-cell-01..05` 目录，实际根路径以本地 `cells.json` 为准。
 
 ## 先看哪些代码文件
 

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "serverDir": "F:/minecraft/test-cells/server-cell-bc-01",
+  "serverJar": "Waterfall.jar",
+  "javaPath": "C:/Program Files/Java/jdk1.8.0_481/bin/java.exe",
+  "minMemoryMb": 512,
+  "maxMemoryMb": 512,
+  "listenHost": "127.0.0.1",
+  "listenPort": 25645,
+  "onlineMode": false,
+  "ipForward": true,
+  "forgeSupport": true,
+  "motd": "&6BlackBoxPro BC",
+  "maxPlayers": 20,
+  "defaultBackend": "cell-02",
+  "sourceConfigs": [
+    "cells.json",
+    "cells-1201.json"
+  ]
+}

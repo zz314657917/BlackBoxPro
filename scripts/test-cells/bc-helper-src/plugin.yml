@@ -1,0 +1,12 @@
+name: TestCellBcBridgeHelper
+main: com.blackboxpro.testcellbcbridge.TestCellBcBridgeHelperPlugin
+version: 0.1.0
+author: Codex
+commands:
+  bbswitch:
+    description: Switch to another backend through the BungeeCord plugin channel.
+    usage: /bbswitch <server>
+    permission: testcellbcbridge.use
+permissions:
+  testcellbcbridge.use:
+    default: true

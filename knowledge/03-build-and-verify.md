@@ -6,25 +6,119 @@
 - `1.12.2` 模块的 `Gradle` 运行 JVM 需要 17 或 21，但编译目标仍是 Java 8。
 - 根、插件、`1.21.1`、`1.12.2` 的 `gradle.properties` 都设置了 `localhost:7890` 代理；无代理环境可能需要先处理依赖下载问题。
 
+## 当前 1.12.2 验证入口
+
+- 当前 active flow 统一走 `scripts/test-cells/`，不再把独立主测试服目录作为默认验证入口。
+- 默认 cell 池为 `cell-01..05`，服务端目录命名约定为 `server-cell-01..05`。
+- 客户端目录命名约定为 `cell-01..05/.minecraft/versions/bot`。
+- 所有 test-cell 客户端当前通过 junction 共享：
+  - `<shared_minecraft_root>/.minecraft/assets`
+  - `<shared_minecraft_root>/.minecraft/libraries`
+- 默认内存配置已收口为：
+  - 服务端 `-Xms2048M -Xmx2048M`
+  - 客户端 `-Xms512m -Xmx1024m`
+
+## 当前 1.20.1 验证入口
+
+- `1.20.1` test-cell 池与 `1.12.2` 分离，固定使用 `scripts/test-cells/cells-1201.json`。
+- 当前池为 `cell-06..08`：
+  - 服务端目录命名约定：`server-cell-1201-06..08`
+  - 客户端目录命名约定：`cell-06..08/.minecraft/versions/1.20.1-Forge_47.3.0`
+- 客户端路线是“精简 mod 路线”：
+  - `assets` / `libraries` 仍通过 junction 复用主整合包共享目录
+  - 每个 cell 的 `mods/` 最终只保留 `BlackBoxPro-forge-1.20.1-*.jar`
+  - 源整合包里的第三方 mod 和侧车目录不会保留
+- 当前池默认内存已收口为：
+  - 服务端 `-Xms1024M -Xmx1024M`
+  - 客户端 `-Xms1024m -Xmx1024m`
+- 仓库里提交的是脱敏样例配置；本地使用前需要先把 `cells.json` / `cells-1201.json` 改成你自己的真实路径。
+
+## test-cell 常用命令
+
+- 查看状态：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Get-TestCellStatus.ps1"`
+- 抢占可用 cell：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Acquire-TestCell.ps1" -Owner "session-name" -ReadyOnly`
+- 启动或校验单个 cell：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode ensure -CellId cell-01`
+- 停止单个 cell：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode stop -CellId cell-01`
+- 停止全部 cell：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Stop-AllTestCells.ps1"`
+- 精简 test-cell 服务端插件：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Minimize-TestCellServerPlugins.ps1"`
+
+## 1.12.2 BC 测试入口
+
+- BC 代理服配置固定为 `scripts/test-cells/cells-bc.json`，本机默认目录是 `F:/minecraft/test-cells/server-cell-bc-01`。
+- BC 默认监听 `127.0.0.1:25645`，默认后端是 `cell-02`。
+- 当前 1.12.2 Forge bot 走 Waterfall 时必须保持 `forgeSupport = true`。
+- BC 代理自身内存固定为 `512M / 512M`。
+- 后端准备入口：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Prepare-TestCellBcBackends.ps1" -Mode prepare -Owner "<owner>"`
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Prepare-TestCellBcBackends.ps1" -Mode status -Owner "<owner>"`
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Prepare-TestCellBcBackends.ps1" -Mode restore -Owner "<owner>"`
+- `prepare` 默认会处理 `cell-02,cell-03`：
+  - 写入同一 owner 的 lease
+  - 保存 state 到 `scripts/test-cells/locks/bc-backend-prep/<owner>.json`
+  - 临时把后端 `spigot.yml` 改成 `bungeecord: true`
+  - 临时把后端 `plugins/BlackBoxPro/config.yml` 的 `mod-http-address` 指向 bot cell 的共享 mod 端口，例如 `http://localhost:38091`
+- `restore` 会停止目标后端进程、恢复原文、删除 state、释放本次 owner 写下的 lease，不负责重启后端。
+- 真实 BC smoke：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Run-TestCellBcSmoke.ps1"`
+  - 预期链路是 `bot -> BC:25645 -> cell-02 -> bbswitch cell-03`。
+  - smoke cleanup 会停止 BC、bot、后端，恢复配置，删除临时 helper jar 和临时后端 launcher。
+- 5 后端 BC smoke：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Run-TestCellBcSmoke.ps1" -BotCellId cell-02 -DefaultBackendId cell-02 -BackendCellIds cell-02,cell-01,cell-03,cell-04,cell-05`
+  - 已验证链路是 `cell-02 -> cell-01 -> cell-03 -> cell-04 -> cell-05`。
+  - Bot 连接 BC 必须使用 `localhost:25645`，不要使用 `127.0.0.1:25645`。
+  - 如果 smoke 被中断，先执行 `Invoke-TestCellBc.ps1 -Mode stop`，再执行 `Prepare-TestCellBcBackends.ps1 -Mode restore -Owner <owner>`，最后确认无残留 `cmd/java/javaw` 和临时 helper/launcher。
+
+## 1.20.1 test-cell 常用命令
+
+- provision 三个 cell：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Provision-TestCells1201.ps1"`
+- 查看状态：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Get-TestCellStatus.ps1" -ConfigPath "scripts/test-cells/cells-1201.json"`
+- 抢占可用 cell：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Acquire-TestCell.ps1" -Owner "session-name" -ConfigPath "scripts/test-cells/cells-1201.json" -ReadyOnly`
+- 同步当前插件和 Forge 1.20.1 客户端产物：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Sync-TestCell1201Artifacts.ps1"`
+  - 该脚本只应同步正式运行 jar，不应把 `*-dev-run.jar` 推进 `mods/`
+- 启动或校验单个 cell：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell1201.ps1" -Mode ensure -CellId cell-06`
+- 跑基础 smoke：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell1201.ps1" -Mode smoke -CellId cell-06`
+- 停止单个 cell：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell1201.ps1" -Mode stop -CellId cell-06`
+- 停止全部 1.20.1 cell：
+  - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Stop-AllTestCells1201.ps1"`
+
+## test-cell 插件精简边界
+
+- `Minimize-TestCellServerPlugins.ps1` 默认只处理叶子目录名符合 `server-cell-*` 的受管测试服。
+- 即使显式传 `cell-01`，只要该 cell 不在 `server-cell-*` 路径下，脚本也会直接拒绝。
+- 主测试服 `plugins/` 目录不属于当前 active flow；如果需要操作它，必须走显式人工决策，不应复用 test-cell 精简脚本。
+
 ## 根项目常用任务
 
 ### 推荐入口
 
 - `.\gradlew buildAll`
-  构建 `common`、`1.21.11`、`1.21.1`、`1.12.2` 和 `plugin`，并把产物收集到根 `build/libs/`。
+  构建 `common`、`1.21.11`、`1.20.1`、`1.12.2` 和 `plugin`，并把产物收集到根 `build/libs/`。
 - `.\gradlew plugin_build`
   单独构建服务端插件。
 - `.\gradlew forge1122_build`
   单独构建 `1.12.2` 独立工程。
+- `.\gradlew forge1201_build`
+  单独构建 `1.20.1` 独立 Forge 工程。
 
 ### 现代端分开构建
 
 - `.\gradlew mod2111_build`
   构建 `1.21.11 runtime/fabric/neoforge`。
-- `.\gradlew mod1211_build`
-  构建 `1.21.1 runtime/fabric/neoforge` 的 class/resources。
-- `.\gradlew mod1211_pack_neoforge`
-  额外打包 `1.21.1` NeoForge JAR；根 `buildAll` 实际依赖的是这个任务。
+- `1.21.1` 当前不再提供根包装任务。
+  如果后续确实要继续构建这条兼容线，改为在 `mod/` 聚合工程内显式执行 `:1.21.1:*` 子模块任务。
 
 ### 清理
 
@@ -51,38 +145,64 @@
 - 插件：`plugin/build/libs/BlackBoxPro-Plugin-<version>.jar`
 - Fabric 1.21.11：`mod/1.21.11/fabric/build/libs/BlackBoxPro-fabric-1.21.11-<version>.jar`
 - NeoForge 1.21.11：`mod/1.21.11/neoforge/build/libs/BlackBoxPro-neoforge-1.21.11-<version>.jar`
-- Fabric 1.21.1：`mod/1.21.1/fabric/build/libs/BlackBoxPro-fabric-1.21.1-<version>.jar`
-- NeoForge 1.21.1：`mod/1.21.1/neoforge/build/libs/BlackBoxPro-neoforge-1.21.1-<version>.jar`
+- Fabric 1.21.1：`mod/1.21.1/fabric/build/libs/BlackBoxPro-fabric-1.21.1-<version>.jar`（仅在 `mod/` 聚合工程内单独构建时产出）
+- NeoForge 1.21.1：`mod/1.21.1/neoforge/build/libs/BlackBoxPro-neoforge-1.21.1-<version>.jar`（仅在 `mod/` 聚合工程内单独构建时产出）
 - Forge 1.12.2：`mod/1.12.2/forge/build/libs/BlackBoxPro-forge-1.12.2-<version>.jar`
 
 ## 运行时端口
 
-- 插件 HTTP：默认 `38080`
-- 客户端 Mod HTTP：默认 `38081`
-- Minecraft 服务器端口由实际服务端决定，历史文档里常见 `25565`
+- `cell-01`：`25565 / 38080 / 38081`
+- `cell-02`：`25575 / 38090 / 38091`
+- `cell-03`：`25585 / 38100 / 38101`
+- `cell-04`：`25595 / 38110 / 38111`
+- `cell-05`：`25605 / 38120 / 38121`
+- `cell-06`：`25615 / 38130 / 38131`
+- `cell-07`：`25625 / 38140 / 38141`
+- `cell-08`：`25635 / 38150 / 38151`
 
 ## 最短验证路径
 
-### 插件
+1.12.2 的 `cell-01..05` 都应保持 Germ 可用，服务端 `plugins/` 里有 `GermPlugin`，bot `mods/` 里有 `GermMod`。如发现漂移，先执行 `scripts/test-cells/Sync-TestCellBaselinePlugins.ps1 -DryRun` 查看差异，再执行同步脚本修正。
 
-1. 构建 `plugin_build`
-2. 启动服务端并加载插件
-3. 执行 `/blackbox status`
-4. 请求 `GET http://localhost:38080/status`
+### 单个 cell
 
-### 客户端 Mod
+1. 构建需要的插件或 Mod 产物。
+2. 按需把产物复制到目标 cell 目录，例如：
+   - `<test_cell_server_root>/server-cell-01/plugins/`
+   - `<test_cell_workspace_root>/cell-01/.minecraft/versions/bot/mods/`
+3. 执行：
+   - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode ensure -CellId cell-01`
+4. 观察：
+   - `GET http://localhost:38080/status`
+   - `GET http://localhost:38081/status`
+   - relay 的 `query_player_state` 是否成功
+5. 验证完成后执行：
+   - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode stop -CellId cell-01`
 
-1. 启动对应客户端
-2. 请求 `GET http://localhost:38081/status`
-3. 观察 `ready` 字段和 `actions` 数量
-4. 用 `POST /execute` 发送一个低风险查询 action，例如 `query_player_state`
+### QQFarm / 业务链自动化
 
-### 插件中继链路
+1. 使用 `QQFarm/scripts/run-sprint-02-blackbox-qa.ps1`
+2. 推荐命令：
+  - `powershell -ExecutionPolicy Bypass -File "<qqfarm_repo>/scripts/run-sprint-02-blackbox-qa.ps1" -Mode both -AcquireCell -CleanupCell -CellConfigPath "<blackboxpro_repo>/scripts/test-cells/cells.json"`
+3. 期望结果里至少看到：
+   - `ok=true`
+   - `fixturesRestored=true`
+   - `cellStopped=true`
 
-1. 插件配置 `test-mode: dual`
-2. `mod-http-address` 指向在线客户端
-3. 调 `POST http://localhost:38080/execute`
-4. 观察插件是否转发到 Mod 并拿到响应
+### Forge 1.20.1 单个 cell
+
+1. 执行 `.\gradlew forge1201_build` 和 `.\gradlew plugin_build`。
+2. 执行：
+   - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Sync-TestCell1201Artifacts.ps1"`
+3. 拉起 cell：
+   - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell1201.ps1" -Mode ensure -CellId cell-06`
+4. 观察：
+   - `GET http://localhost:38130/status`
+   - `GET http://localhost:38131/status`
+   - direct `query_screen_state`
+   - direct 或 relay `query_player_state`
+5. 需要截图/基础回归时执行：
+   - `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell1201.ps1" -Mode smoke -CellId cell-06`
 
 ## 已确认但尚未实现的接口
 

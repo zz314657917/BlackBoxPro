@@ -267,6 +267,30 @@ object HighLevelActions {
         MouseActions.queryChatStyle(player, match, index = 0)
 
     /**
+     * 将鼠标移动到当前屏幕的 GUI 坐标。
+     */
+    fun moveMouse(player: Player, x: Double, y: Double): CompletableFuture<ResponseMessage> =
+        MouseActions.moveMouse(player, x, y)
+
+    /**
+     * 在当前鼠标位置执行一次点击。
+     */
+    fun clickMouse(player: Player, button: Int = 0, clickCount: Int = 1): CompletableFuture<ResponseMessage> =
+        MouseActions.clickMouse(player, button, clickCount)
+
+    /**
+     * 将鼠标移动到指定 GUI 坐标后执行点击。
+     */
+    fun clickScreenAt(
+        player: Player,
+        x: Double,
+        y: Double,
+        button: Int = 0,
+        clickCount: Int = 1
+    ): CompletableFuture<ResponseMessage> =
+        MouseActions.clickScreenAt(player, x, y, button, clickCount)
+
+    /**
      * 将鼠标悬停到当前容器中的指定槽位。
      */
     fun hoverSlot(player: Player, windowId: Int, slot: Int, durationTicks: Int = 0): CompletableFuture<ResponseMessage> =
@@ -279,10 +303,34 @@ object HighLevelActions {
         MouseActions.querySlotTooltip(player, slot, advanced = false)
 
     /**
+     * 查询当前鼠标与屏幕坐标状态。
+     */
+    fun queryCursorState(player: Player): CompletableFuture<ResponseMessage> =
+        MouseActions.queryCursorState(player)
+
+    /**
      * 查询当前鼠标悬浮 Tooltip 状态。
      */
     fun queryTooltipState(player: Player): CompletableFuture<ResponseMessage> =
         MouseActions.queryTooltipState(player)
+
+    /**
+     * 在客户端按下一个按键。GUI 打开时走当前屏幕的 keyTyped；无 GUI 时走 MC key binding。
+     */
+    fun keyPress(
+        player: Player,
+        key: String? = null,
+        keyCode: Int? = null,
+        char: Char? = null,
+        pressTicks: Int = 1
+    ): CompletableFuture<ResponseMessage> =
+        KeyboardActions.keyPress(player, key, keyCode, char, pressTicks)
+
+    /**
+     * 向当前客户端 GUI 输入文本。
+     */
+    fun typeText(player: Player, text: String, intervalTicks: Int = 0): CompletableFuture<ResponseMessage> =
+        KeyboardActions.typeText(player, text, intervalTicks)
 
     /**
      * 先查样式，若存在 ClickEvent 再执行点击。

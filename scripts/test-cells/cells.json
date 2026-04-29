@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "defaultCellId": "cell-01",
+  "defaults": {
+    "enabled": false,
+    "serverJar": "catserver.jar",
+    "serverJava": "C:/path/to/java8/bin/java.exe",
+    "serverMinMemoryMb": 512,
+    "serverMaxMemoryMb": 1024,
+    "botJava": "C:/path/to/java8/bin/javaw.exe",
+    "botMinMemoryMb": 512,
+    "botMaxMemoryMb": 1024,
+    "botPlayer": "bot_player",
+    "botVersionName": "bot",
+    "visitorName": "visitor_player",
+    "visitorUuid": "00000000-0000-0000-0000-000000000001",
+    "ownerName": "owner_player",
+    "ownerUuid": "00000000-0000-0000-0000-000000000002"
+  },
+  "cells": [
+    {
+      "id": "cell-01",
+      "label": "template-cell-01",
+      "enabled": true,
+      "serverDir": "D:/mc-test-cells/server-cell-01",
+      "playerDataDir": "D:/mc-test-cells/server-cell-01/plugins/TargetPlugin/playerdata",
+      "botWorkspaceRoot": "D:/mc-test-cells/cell-01",
+      "botVersionDir": "D:/mc-test-cells/cell-01/.minecraft/versions/bot",
+      "assetsDir": "D:/mc-test-cells/cell-01/.minecraft/assets",
+      "librariesDir": "D:/mc-test-cells/cell-01/.minecraft/libraries",
+      "serverPort": 25565,
+      "pluginHttpPort": 38080,
+      "modHttpPort": 38081
+    },
+    {
+      "id": "cell-02",
+      "label": "template-cell-02",
+      "enabled": true,
+      "serverDir": "D:/mc-test-cells/server-cell-02",
+      "playerDataDir": "D:/mc-test-cells/server-cell-02/plugins/TargetPlugin/playerdata",
+      "botWorkspaceRoot": "D:/mc-test-cells/cell-02",
+      "botVersionDir": "D:/mc-test-cells/cell-02/.minecraft/versions/bot",
+      "assetsDir": "D:/mc-test-cells/cell-02/.minecraft/assets",
+      "librariesDir": "D:/mc-test-cells/cell-02/.minecraft/libraries",
+      "serverPort": 25575,
+      "pluginHttpPort": 38090,
+      "modHttpPort": 38091
+    },
+    {
+      "id": "cell-03",
+      "label": "template-cell-03",
+      "enabled": true,
+      "serverDir": "D:/mc-test-cells/server-cell-03",
+      "playerDataDir": "D:/mc-test-cells/server-cell-03/plugins/TargetPlugin/playerdata",
+      "botWorkspaceRoot": "D:/mc-test-cells/cell-03",
+      "botVersionDir": "D:/mc-test-cells/cell-03/.minecraft/versions/bot",
+      "assetsDir": "D:/mc-test-cells/cell-03/.minecraft/assets",
+      "librariesDir": "D:/mc-test-cells/cell-03/.minecraft/libraries",
+      "serverPort": 25585,
+      "pluginHttpPort": 38100,
+      "modHttpPort": 38101
+    },
+    {
+      "id": "cell-04",
+      "label": "template-cell-04",
+      "enabled": true,
+      "serverDir": "D:/mc-test-cells/server-cell-04",
+      "playerDataDir": "D:/mc-test-cells/server-cell-04/plugins/TargetPlugin/playerdata",
+      "botWorkspaceRoot": "D:/mc-test-cells/cell-04",
+      "botVersionDir": "D:/mc-test-cells/cell-04/.minecraft/versions/bot",
+      "assetsDir": "D:/mc-test-cells/cell-04/.minecraft/assets",
+      "librariesDir": "D:/mc-test-cells/cell-04/.minecraft/libraries",
+      "serverPort": 25595,
+      "pluginHttpPort": 38110,
+      "modHttpPort": 38111
+    },
+    {
+      "id": "cell-05",
+      "label": "template-cell-05",
+      "enabled": true,
+      "serverDir": "D:/mc-test-cells/server-cell-05",
+      "playerDataDir": "D:/mc-test-cells/server-cell-05/plugins/TargetPlugin/playerdata",
+      "botWorkspaceRoot": "D:/mc-test-cells/cell-05",
+      "botVersionDir": "D:/mc-test-cells/cell-05/.minecraft/versions/bot",
+      "assetsDir": "D:/mc-test-cells/cell-05/.minecraft/assets",
+      "librariesDir": "D:/mc-test-cells/cell-05/.minecraft/libraries",
+      "serverPort": 25605,
+      "pluginHttpPort": 38120,
+      "modHttpPort": 38121
+    }
+  ]
+}

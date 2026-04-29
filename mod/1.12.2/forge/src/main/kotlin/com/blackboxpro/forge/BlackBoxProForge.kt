@@ -1,9 +1,10 @@
 package com.blackboxpro.forge
 
 import com.blackboxpro.common.protocol.ResponseMessage
+import com.blackboxpro.common.runtime.config.RuntimeBlackBoxConfig
+import com.blackboxpro.common.runtime.dispatcher.RuntimeCommandDispatcher
 import com.blackboxpro.common.runtime.dispatcher.RuntimeResponseSender
 import com.blackboxpro.forge.action.composite.TickScheduler
-import com.blackboxpro.common.runtime.dispatcher.RuntimeCommandDispatcher
 import com.blackboxpro.forge.dispatcher.ActionRegistry
 import com.blackboxpro.forge.dispatcher.CommandDispatcher
 import com.blackboxpro.forge.http.ModHttpServer
@@ -12,7 +13,6 @@ import com.blackboxpro.forge.util.ChatHistoryBuffer
 import com.blackboxpro.runtime.bindings.ForgeBindings
 import com.google.gson.Gson
 import net.minecraft.client.Minecraft
-import net.minecraft.util.text.ITextComponent
 import net.minecraftforge.client.event.ClientChatReceivedEvent
 import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.fml.common.Mod
@@ -33,27 +33,44 @@ object BlackBoxProForge {
     const val VERSION = "1.0.0"
 
     private val logger = LogManager.getLogger("BlackBoxProForge")
-
     private val gson = Gson()
+
+    private fun loadRuntimeConfig() {
+        val current = RuntimeBlackBoxConfig.current
+        val httpPort = System.getProperty("blackboxpro.httpPort")?.toIntOrNull()
+            ?: current.network.httpPort
+        val responseTimeoutMs = System.getProperty("blackboxpro.responseTimeoutMs")?.toLongOrNull()
+            ?: current.network.responseTimeoutMs
+
+        RuntimeBlackBoxConfig.update(
+            current.copy(
+                network = current.network.copy(
+                    httpPort = httpPort,
+                    responseTimeoutMs = responseTimeoutMs
+                )
+            )
+        )
+
+        logger.info(
+            "Loaded runtime config: httpPort={}, responseTimeoutMs={}",
+            httpPort,
+            responseTimeoutMs
+        )
+    }
 
     @Mod.EventHandler
     fun init(event: FMLInitializationEvent) {
-        // 0. 初始化 Forge 平台绑定
         ForgeBindings.init()
 
-        // 绑定 RuntimeResponseSender，使异步 Action 能通过 ResponseFutureRegistry 回复
         RuntimeResponseSender.bind(object : RuntimeResponseSender.Sender {
             override fun sendResponse(id: String, status: String, message: String?, data: com.google.gson.JsonObject?) {
                 ResponseFutureRegistry.onResponseJson(gson.toJson(ResponseMessage(id, status, message, data)))
             }
         })
 
-        // 1. 加载配置
-
-        // 2. 注册所有行为执行器
+        loadRuntimeConfig()
         ActionRegistry.registerAll()
 
-        // 2.1 绑定 RuntimeCommandDispatcher，使 BatchAction 的子 action 能正确解析
         RuntimeCommandDispatcher.bind(
             loggerSupplier = ForgeBindings,
             mainThreadExecutor = object : RuntimeCommandDispatcher.MainThreadExecutor {
@@ -66,12 +83,10 @@ object BlackBoxProForge {
             }
         )
 
-        // 3. 注册事件监听器
         MinecraftForge.EVENT_BUS.register(CommandDispatcher)
         MinecraftForge.EVENT_BUS.register(TickScheduler)
         MinecraftForge.EVENT_BUS.register(this)
 
-        // 4. 启动 HTTP Server
         ModHttpServer.start()
         Runtime.getRuntime().addShutdownHook(Thread { ModHttpServer.stop() })
 
@@ -80,8 +95,7 @@ object BlackBoxProForge {
 
     @SubscribeEvent
     fun onChatReceived(event: ClientChatReceivedEvent) {
-        val type = event.type.ordinal
-        val typeName = when (type) {
+        val typeName = when (event.type.ordinal) {
             0 -> "CHAT"
             1 -> "SYSTEM"
             2 -> "ACTION_BAR"

@@ -8,6 +8,40 @@ import java.util.concurrent.CompletableFuture
 
 object MouseActions {
 
+    fun moveMouse(
+        player: Player,
+        x: Double,
+        y: Double
+    ): CompletableFuture<ResponseMessage> =
+        BlackBoxApi.sendAsync(player, "move_mouse", JsonObject().apply {
+            addProperty("x", x)
+            addProperty("y", y)
+        })
+
+    fun clickMouse(
+        player: Player,
+        button: Int = 0,
+        clickCount: Int = 1
+    ): CompletableFuture<ResponseMessage> =
+        BlackBoxApi.sendAsync(player, "click_mouse", JsonObject().apply {
+            addProperty("button", button)
+            addProperty("clickCount", clickCount)
+        })
+
+    fun clickScreenAt(
+        player: Player,
+        x: Double,
+        y: Double,
+        button: Int = 0,
+        clickCount: Int = 1
+    ): CompletableFuture<ResponseMessage> =
+        BlackBoxApi.sendAsync(player, "click_screen_at", JsonObject().apply {
+            addProperty("x", x)
+            addProperty("y", y)
+            addProperty("button", button)
+            addProperty("clickCount", clickCount)
+        })
+
     fun clickChatText(
         player: Player,
         match: String,
@@ -45,6 +79,27 @@ object MouseActions {
         advanced: Boolean = false
     ): CompletableFuture<ResponseMessage> =
         QueryActions.querySlotTooltip(player, slot, advanced)
+
+    fun queryCursorState(player: Player): CompletableFuture<ResponseMessage> =
+        QueryActions.queryCursorState(player)
+
+    fun queryGermScreen(
+        player: Player,
+        maxDepth: Int = 4,
+        maxComponents: Int = 200,
+        includeFields: Boolean = false
+    ): CompletableFuture<ResponseMessage> =
+        QueryActions.queryGermScreen(player, maxDepth, maxComponents, includeFields)
+
+    fun queryGermHitTest(
+        player: Player,
+        x: Double? = null,
+        y: Double? = null,
+        maxDepth: Int = 4,
+        maxComponents: Int = 200,
+        includeFields: Boolean = false
+    ): CompletableFuture<ResponseMessage> =
+        QueryActions.queryGermHitTest(player, x, y, maxDepth, maxComponents, includeFields)
 
     fun queryTooltipState(player: Player): CompletableFuture<ResponseMessage> =
         QueryActions.queryTooltipState(player)

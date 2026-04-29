@@ -24,6 +24,7 @@ repositories {
 
 dependencies {
     api("com.google.code.gson:gson:2.10.1")
+    testImplementation(kotlin("test"))
 }
 
 tasks.withType<KotlinCompile> {
@@ -41,4 +42,8 @@ java {
 
 kotlin {
     jvmToolchain(21)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

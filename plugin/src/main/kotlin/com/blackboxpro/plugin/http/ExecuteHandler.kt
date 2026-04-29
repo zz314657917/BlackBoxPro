@@ -10,12 +10,17 @@ import com.sun.net.httpserver.HttpHandler
 import org.bukkit.Bukkit
 import taboolib.common.platform.function.submit
 import taboolib.common.platform.function.warning
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 
 object ExecuteHandler : HttpHandler {
 
     private val gson = Gson()
+    private val runTestTimeoutExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable, "BlackBoxPro-RunTestTimeout").apply { isDaemon = true }
+    }
 
     private const val MAX_BODY_SIZE = 1024 * 1024 // 1MB
 
@@ -94,7 +99,26 @@ object ExecuteHandler : HttpHandler {
             "smoke" -> BlackBoxTestRunner.runSmoke(player, consoleSender)
             else -> BlackBoxTestRunner.runFull(player, consoleSender)
         }
-        future.orTimeout(1800, TimeUnit.SECONDS).whenComplete { result, error ->
+        val completed = AtomicBoolean(false)
+        val timeoutTask = runTestTimeoutExecutor.schedule({
+            if (!completed.compareAndSet(false, true)) {
+                return@schedule
+            }
+            try {
+                sendHttpResponse(
+                    exchange,
+                    gson.toJson(ResponseMessage(command.id, "failure", "Test timed out after 30 minutes"))
+                )
+            } catch (e: Exception) {
+                warning("[BlackBoxPro] Failed to send timeout response: ${e.message}")
+            }
+        }, 1800, TimeUnit.SECONDS)
+
+        future.whenComplete { result, error ->
+            if (!completed.compareAndSet(false, true)) {
+                return@whenComplete
+            }
+            timeoutTask.cancel(false)
             try {
                 val resp = if (error != null) {
                     val msg = if (error is TimeoutException) "Test timed out after 30 minutes" else "Test failed: ${error.message}"
