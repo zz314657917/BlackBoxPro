@@ -9,6 +9,7 @@
 ## 当前目标
 
 - 把已经验证过的 test-cell / Germ / BC 能力收口到主线。
+- 收口本轮 Lmshop Germ 验收辅助能力：`germ_gui_part_dos` 已能从 Germ YAML 解析 `clickDos`，并用显式 `player_command` 模式复现玩家命令按钮语义。
 - 保持 `knowledge/` 作为下一次会话的接手入口。
 - 清理已合并分支和旧 worktree，避免后续继续从过期分支开始。
 
@@ -20,7 +21,10 @@
 - Germ 只读探针：
   - 新增 `query_germ_screen` 和 `query_germ_hit_test`。
   - `query_germ_hit_test` 已能在真实 `germ_gui_loading` 页面返回 texture、text、gif 的候选 bounds 和 hit 结果。
-  - 当前不提供 `click_germ_component`；专用点击 hook 需要等真实业务页面 bounds 稳定后单独设计。
+- Germ 显式动作：
+  - `click_germ_component` 已加入客户端侧尝试，但在 Lmshop 真页上仍未触发购买。
+  - `germ_gui_part_dos` 已加入服务端侧执行入口，支持 `execute=false` dry-run、YAML fallback、PAPI placeholder 解析和 `player_command` 模式。
+  - 2026-05-01 `cell-01` 验证：`商品2点券` 的 `clickDos` 生成 `#4 [DELIVERY_DISPATCHED] category / solar_key / player_points 500`；`商品1点券` dry-run 后订单数仍为 1。
 - 键盘输入 action：
   - 新增 `key_press`、`type_text`。
   - 1.12.2 Forge 已验证打开背包、打开聊天、输入文本、回车发送等基础链路。
@@ -57,18 +61,19 @@
 
 - 尚未用具体业务 Forge 1.12.2 模组 jar 在 `cell-20..22` 上跑功能验证。
 - `Run-TestCellMod1122Regression.ps1 -Scope smoke` 尚未在 `cell-20..22` 上跑完整 `run_test`。
-- Lmshop 真实 Germ 商城页的购买按钮/商品组件 bounds 尚未复测。
+- Lmshop 真实 Germ 商城页已复测：页面可打开，`germ_gui_part_dos` 可按 YAML `partId` 解析并执行 `clickDos`；真实物理坐标点击仍未通过。
 - 现代端 `1.21.11` / `1.21.1` 尚未同步新增的屏幕鼠标和键盘输入 action。
 
 ## 下一步
 
-1. 合并当前整理提交到 `main`，完成分支/worktree 清理。
+1. 如果 Lmshop Sprint 2 接受“Germ YAML clickDos 语义执行”作为自动化验收证据，使用 `germ_gui_part_dos execute=true mode=player_command`；如果仍要求“真实物理点击”，继续增强客户端侧 `click_germ_component` / 鼠标注入。
 2. 如果要测 CloudStorage 或其他 Forge 1.12.2 模组，先构建目标 jar，再执行：
    `powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Run-TestCellMod1122Regression.ps1" -Scope startup -ModJar "<jar>" -AcquireCell`
 3. 如果要人工进游戏测 GUI，在上面的命令后加 `-KeepCell`，结束后手动 stop + release。
-4. 用 `query_germ_hit_test` 对 Lmshop Germ 商城页采样，形成购买按钮只读命中证据；确认后再设计显式点击动作。
 
 ## 验证记录
 
 - 2026-04-24 到 2026-04-29 已多次执行 `common test`、`forge1122_build`、`plugin build`、test-cell startup、BC smoke、Germ hit-test 和 smoke 回归；详细历史见 `knowledge/tasks/timeline.md`。
+- 2026-05-01 已执行 `common_build plugin_build`，并在 `cell-01` 通过 relay、Germ 页面打开、`germ_gui_part_dos` dry-run、`player_command` 成功购买和 dry-run 无副作用验证。
 - 本轮分支整理前已执行 `git diff --check`，仅有 Windows line-ending 提示，无 whitespace error。
+- 2026-05-01 最终收口复核已执行 `common_build plugin_build forge1122_build`，退出码 0；`cell-01` plugin/mod `/status` ready，relay `query_player_state` 成功，`germ_gui_part_dos execute=false` 可解析 `商品2点券`，随后已 stop + release，端口 `25570/38080/38081` 无监听。

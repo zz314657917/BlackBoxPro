@@ -1,10 +1,13 @@
 package com.blackboxpro.plugin.api.action
 
 import com.blackboxpro.common.protocol.ResponseMessage
+import com.blackboxpro.common.protocol.CommandMessage
 import com.blackboxpro.plugin.api.BlackBoxApi
+import com.blackboxpro.plugin.http.ServerGermActions
 import com.google.gson.JsonObject
 import org.bukkit.entity.Player
 import java.util.concurrent.CompletableFuture
+import java.util.UUID
 
 object MouseActions {
 
@@ -41,6 +44,57 @@ object MouseActions {
             addProperty("button", button)
             addProperty("clickCount", clickCount)
         })
+
+    fun clickGermComponent(
+        player: Player,
+        x: Double? = null,
+        y: Double? = null,
+        componentId: String? = null,
+        button: Int = 0,
+        clickCount: Int = 1,
+        maxDepth: Int = 4,
+        maxComponents: Int = 200,
+        includeFields: Boolean = false,
+        fallbackScreenClick: Boolean = false
+    ): CompletableFuture<ResponseMessage> =
+        BlackBoxApi.sendAsync(player, "click_germ_component", JsonObject().apply {
+            if (x != null) addProperty("x", x)
+            if (y != null) addProperty("y", y)
+            if (componentId != null) addProperty("componentId", componentId)
+            addProperty("button", button)
+            addProperty("clickCount", clickCount)
+            addProperty("maxDepth", maxDepth)
+            addProperty("maxComponents", maxComponents)
+            addProperty("includeFields", includeFields)
+            addProperty("fallbackScreenClick", fallbackScreenClick)
+        })
+
+    fun germGuiPartDos(
+        player: Player,
+        guiName: String,
+        partId: String,
+        dosType: String = "click",
+        execute: Boolean = true,
+        resolvePlaceholders: Boolean = true,
+        mode: String = "command_util"
+    ): CompletableFuture<ResponseMessage> =
+        CompletableFuture.completedFuture(
+            ServerGermActions.handle(
+                CommandMessage(
+                    id = "api-germ-gui-part-dos-${UUID.randomUUID()}",
+                    action = "germ_gui_part_dos",
+                    params = JsonObject().apply {
+                        addProperty("guiName", guiName)
+                        addProperty("partId", partId)
+                        addProperty("dosType", dosType)
+                        addProperty("execute", execute)
+                        addProperty("resolvePlaceholders", resolvePlaceholders)
+                        addProperty("mode", mode)
+                    },
+                    target = player.name
+                )
+            )
+        )
 
     fun clickChatText(
         player: Player,

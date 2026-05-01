@@ -116,7 +116,13 @@
   - 非 Germ `GuiIngameMenu` 返回 `supported=false`、组件数 `0`、`hitCount=0`
   - 同轮 `run_test scope=smoke` 返回 `passed=22 failed=0 skipped=0 total=22 totalMs=8052`
 - 若某个 cell 的 `/gp open ...` 返回聊天提示 `GermPlugin 的Cdk不是正确的，导致验证失败`，把它记录为该 cell 的 Germ 环境 blocker，换空闲 cell 复测，不要归因到 hit-test action。
-- 当前仍不提供 `click_germ_component`；专用 Germ 点击动作必须等真实业务页面 bounds 稳定后单独设计和验收。
+- 显式副作用动作：
+  - `click_germ_component` 是客户端侧组件点击尝试，必须显式调用，不进入默认 `run_test`。
+  - `germ_gui_part_dos` 是服务端侧 Germ dos 执行入口，参数为 `guiName`、`partId`、`dosType`、`execute`、`resolvePlaceholders`、`mode`。
+  - `execute=false` 只解析 raw/resolved dos 和 part 来源，不触发命令；`execute=true` 才允许副作用。
+  - 当 Germ runtime part 树只暴露 `options` 时，`germ_gui_part_dos` 会回退读取 `plugins/GermPlugin/gui/*.yml`，按 GUI 根名和 partId 查找 `clickDos` 等配置。
+  - `mode=player_command` 只执行 `playercmd<->...`，用于复现 Germ YAML 中玩家命令按钮语义；不要把它写成真实鼠标点击通过。
+- 2026-05-01 在 Lmshop `cell-01` 上验证：`商品2点券` dry-run 解析为 `playercmd<->lmshop buy 2 player_points <token>`；`execute=true, mode=player_command` 后订单为 `#4 [DELIVERY_DISPATCHED] category / solar_key / player_points 500`；随后对 `商品1点券` dry-run 后订单仍为 1，确认 dry-run 无副作用。
 
 ### 1.12.2 BC 手测和 smoke
 

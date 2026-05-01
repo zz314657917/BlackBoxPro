@@ -107,6 +107,7 @@ object ActionRegistry {
         register("move_mouse", MoveMouseAction())
         register("click_mouse", ClickMouseAction())
         register("click_screen_at", ClickScreenAtAction())
+        register("click_germ_component", ClickGermComponentAction())
         register("key_press", KeyPressAction())
         register("type_text", TypeTextAction())
         register("connect_to_server", ConnectToServerAction())

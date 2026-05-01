@@ -16,6 +16,8 @@ object GermScreenProbeHelper {
 
     private const val DEFAULT_MAX_DEPTH = 4
     private const val DEFAULT_MAX_COMPONENTS = 200
+    private const val MAX_DEPTH_LIMIT = 12
+    private const val MAX_COMPONENTS_LIMIT = 2000
     private const val MAX_WARNINGS = 40
     private const val MAX_FIELD_HINTS = 16
     private const val MAX_NUMERIC_HINTS = 40
@@ -77,6 +79,18 @@ object GermScreenProbeHelper {
         val includeFields: Boolean = false,
         val hitX: Double? = null,
         val hitY: Double? = null
+    )
+
+    data class ClickOptions(
+        val maxDepth: Int = DEFAULT_MAX_DEPTH,
+        val maxComponents: Int = DEFAULT_MAX_COMPONENTS,
+        val includeFields: Boolean = false,
+        val hitX: Double? = null,
+        val hitY: Double? = null,
+        val componentId: String? = null,
+        val button: Int = 0,
+        val clickCount: Int = 1,
+        val fallbackScreenClick: Boolean = false
     )
 
     private data class ComponentSnapshot(
@@ -179,6 +193,10 @@ object GermScreenProbeHelper {
 
     private data class NumericRead(val value: Double, val source: String)
 
+    private data class ComponentTarget(val snapshot: ComponentSnapshot, val value: Any)
+
+    private data class InvokeResult(val signature: String, val result: Any?)
+
     fun query(options: ProbeOptions): JsonObject {
         val mc = Minecraft.getMinecraft()
         val screen = mc.currentScreen
@@ -187,8 +205,8 @@ object GermScreenProbeHelper {
         val components = mutableListOf<ComponentSnapshot>()
         val visited = Collections.newSetFromMap(IdentityHashMap<Any, Boolean>())
         val safeOptions = options.copy(
-            maxDepth = options.maxDepth.coerceIn(1, 8),
-            maxComponents = options.maxComponents.coerceIn(1, 500)
+            maxDepth = options.maxDepth.coerceIn(1, MAX_DEPTH_LIMIT),
+            maxComponents = options.maxComponents.coerceIn(1, MAX_COMPONENTS_LIMIT)
         )
         val hitRequested = safeOptions.hitX != null && safeOptions.hitY != null
 
@@ -207,6 +225,7 @@ object GermScreenProbeHelper {
                 options = safeOptions,
                 visited = visited,
                 components = components,
+                componentValues = null,
                 warnings = warnings,
                 mouseX = cursor.mouseX,
                 mouseY = cursor.mouseY,
@@ -266,6 +285,89 @@ object GermScreenProbeHelper {
         return query(options.copy(hitX = hitX, hitY = hitY))
     }
 
+    fun click(options: ClickOptions): JsonObject {
+        val cursor = ScreenMouseHelper.queryCursorState()
+        val hitX = options.hitX ?: cursor.mouseX.toDouble()
+        val hitY = options.hitY ?: cursor.mouseY.toDouble()
+        val safeOptions = ProbeOptions(
+            maxDepth = options.maxDepth,
+            maxComponents = options.maxComponents,
+            includeFields = options.includeFields,
+            hitX = hitX,
+            hitY = hitY
+        ).let {
+            it.copy(
+                maxDepth = it.maxDepth.coerceIn(1, MAX_DEPTH_LIMIT),
+                maxComponents = it.maxComponents.coerceIn(1, MAX_COMPONENTS_LIMIT)
+            )
+        }
+        val components = mutableListOf<ComponentSnapshot>()
+        val values = mutableListOf<Any>()
+        val warnings = mutableListOf<String>()
+        val visited = Collections.newSetFromMap(IdentityHashMap<Any, Boolean>())
+        val screen = Minecraft.getMinecraft().currentScreen ?: throw IllegalStateException("No screen open")
+        val screenHasGermSignal = hasGermSignal(screen.javaClass.name)
+
+        scanValue(
+            value = screen,
+            path = "root",
+            depth = 0,
+            options = safeOptions,
+            visited = visited,
+            components = components,
+            componentValues = values,
+            warnings = warnings,
+            mouseX = cursor.mouseX,
+            mouseY = cursor.mouseY,
+            hitX = hitX,
+            hitY = hitY,
+            parentComponentId = null,
+            germContext = screenHasGermSignal
+        )
+
+        val targets = components.zip(values).map { ComponentTarget(it.first, it.second) }
+        val target = selectClickTarget(targets, options.componentId)
+            ?: throw IllegalStateException("No Germ component matched click target")
+        val repeats = options.clickCount.coerceAtLeast(1)
+        val invoked = mutableListOf<InvokeResult>()
+
+        ScreenMouseHelper.moveMouse(hitX, hitY)
+        repeat(repeats) {
+            invoked.add(invokeBestMouseMethod(target.value, hitX, hitY, options.button))
+        }
+        if (options.fallbackScreenClick) {
+            runCatching {
+                ScreenMouseHelper.clickMouse(options.button, 1)
+            }.onFailure {
+                addWarning(warnings, "fallback-screen-click-failed:${it.javaClass.simpleName}:${it.message}")
+            }
+        }
+
+        val warningArray = JsonArray()
+        warnings.take(MAX_WARNINGS).forEach { warningArray.add(it) }
+        if (warnings.size > MAX_WARNINGS) {
+            warningArray.add("warnings-truncated:${warnings.size - MAX_WARNINGS}")
+        }
+
+        return ScreenMouseHelper.queryCursorState().toJson().apply {
+            addProperty("x", hitX)
+            addProperty("y", hitY)
+            addProperty("button", options.button)
+            addProperty("clickCount", repeats)
+            addProperty("componentCount", components.size)
+            add("target", target.snapshot.toJson(1))
+            add("invoked", JsonArray().apply {
+                invoked.forEach {
+                    add(JsonObject().apply {
+                        addProperty("signature", it.signature)
+                        if (it.result != null) addProperty("result", safeString(it.result))
+                    })
+                }
+            })
+            add("probeWarnings", warningArray)
+        }
+    }
+
     private fun scanValue(
         value: Any?,
         path: String,
@@ -273,6 +375,7 @@ object GermScreenProbeHelper {
         options: ProbeOptions,
         visited: MutableSet<Any>,
         components: MutableList<ComponentSnapshot>,
+        componentValues: MutableList<Any>?,
         warnings: MutableList<String>,
         mouseX: Int,
         mouseY: Int,
@@ -297,7 +400,7 @@ object GermScreenProbeHelper {
         if (type.isArray) {
             val length = runCatching { Array.getLength(value) }.getOrDefault(0)
             for (i in 0 until length.coerceAtMost(options.maxComponents)) {
-                scanValue(Array.get(value, i), "$path[$i]", depth + 1, options, visited, components, warnings, mouseX, mouseY, hitX, hitY, parentComponentId, currentGermContext)
+                scanValue(Array.get(value, i), "$path[$i]", depth + 1, options, visited, components, componentValues, warnings, mouseX, mouseY, hitX, hitY, parentComponentId, currentGermContext)
             }
             return
         }
@@ -306,7 +409,7 @@ object GermScreenProbeHelper {
             var index = 0
             for (entry in value) {
                 if (index >= options.maxComponents) break
-                scanValue(entry, "$path[$index]", depth + 1, options, visited, components, warnings, mouseX, mouseY, hitX, hitY, parentComponentId, currentGermContext)
+                scanValue(entry, "$path[$index]", depth + 1, options, visited, components, componentValues, warnings, mouseX, mouseY, hitX, hitY, parentComponentId, currentGermContext)
                 index++
             }
             return
@@ -316,7 +419,7 @@ object GermScreenProbeHelper {
             var index = 0
             for (entry in value.entries) {
                 if (index >= options.maxComponents) break
-                scanValue(entry.value, "$path{${safeString(entry.key)}}", depth + 1, options, visited, components, warnings, mouseX, mouseY, hitX, hitY, parentComponentId, currentGermContext)
+                scanValue(entry.value, "$path{${safeString(entry.key)}}", depth + 1, options, visited, components, componentValues, warnings, mouseX, mouseY, hitX, hitY, parentComponentId, currentGermContext)
                 index++
             }
             return
@@ -340,6 +443,7 @@ object GermScreenProbeHelper {
         val nextParentComponentId = snapshot?.id ?: parentComponentId
         if (snapshot != null) {
             components.add(snapshot)
+            componentValues?.add(value)
             if (components.size >= options.maxComponents) {
                 addWarning(warnings, "component-limit-reached:${options.maxComponents}")
                 return
@@ -357,7 +461,7 @@ object GermScreenProbeHelper {
                 addWarning(warnings, "field-read-failed:$path.${field.name}:${it.javaClass.simpleName}")
                 null
             }
-            scanValue(child, "$path.${field.name}", depth + 1, options, visited, components, warnings, mouseX, mouseY, hitX, hitY, nextParentComponentId, currentGermContext)
+            scanValue(child, "$path.${field.name}", depth + 1, options, visited, components, componentValues, warnings, mouseX, mouseY, hitX, hitY, nextParentComponentId, currentGermContext)
         }
     }
 
@@ -416,6 +520,10 @@ object GermScreenProbeHelper {
             invokeHitPredicate(value, hitX, hitY, warnings)
         } else {
             null
+        }
+
+        if (hitX != null && hitY != null && !hasBounds && predicateHit == null) {
+            return null
         }
         val containsHit = when {
             boundsHitCandidate != null -> true
@@ -641,6 +749,16 @@ object GermScreenProbeHelper {
                     height = obfuscatedHeight.value
                 )
             )
+            addBoundsCandidate(
+                candidates,
+                BoundsCandidate(
+                    source = "germ-obfuscated:do/super/null/throws",
+                    x = obfuscatedX.value,
+                    y = obfuscatedY.value,
+                    width = obfuscatedHeight.value,
+                    height = obfuscatedWidth.value
+                )
+            )
         }
 
         return candidates.take(MAX_BOUNDS_CANDIDATES)
@@ -829,6 +947,95 @@ object GermScreenProbeHelper {
             methods.add(methodSignature(method))
         }
         return methods.toList()
+    }
+
+    private fun selectClickTarget(targets: List<ComponentTarget>, componentId: String?): ComponentTarget? {
+        if (!componentId.isNullOrBlank()) {
+            return targets.firstOrNull { it.snapshot.id == componentId }
+        }
+        return targets
+            .filter { it.snapshot.containsHit == true }
+            .sortedWith(compareBy<ComponentTarget> { it.snapshot.area ?: Double.MAX_VALUE }
+                .thenByDescending { it.snapshot.depth }
+                .thenByDescending { it.snapshot.order })
+            .firstOrNull()
+    }
+
+    private fun invokeBestMouseMethod(value: Any, hitX: Double, hitY: Double, button: Int): InvokeResult {
+        val candidates = declaredMethods(value.javaClass)
+            .asSequence()
+            .filter { !Modifier.isStatic(it.modifiers) }
+            .filter { looksLikeInvokableMouseMethod(it) }
+            .sortedWith(compareByDescending<Method> { mouseMethodPriority(it) }.thenBy { it.parameterTypes.size })
+            .toList()
+        val failures = mutableListOf<String>()
+        for (method in candidates) {
+            val args = buildMouseArgs(method.parameterTypes, hitX, hitY, button) ?: continue
+            val signature = methodSignature(method)
+            try {
+                method.isAccessible = true
+                val result = method.invoke(value, *args)
+                return InvokeResult(signature, result)
+            } catch (it: Throwable) {
+                val target = if (it is java.lang.reflect.InvocationTargetException) it.targetException ?: it else it
+                failures.add("$signature:${target.javaClass.simpleName}:${target.message}")
+            }
+        }
+        throw IllegalStateException(
+            if (failures.isEmpty()) {
+                "No invokable Germ mouse method on ${value.javaClass.name}"
+            } else {
+                "No Germ mouse method invocation succeeded: ${failures.joinToString("; ")}"
+            }
+        )
+    }
+
+    private fun looksLikeInvokableMouseMethod(method: Method): Boolean {
+        val params = method.parameterTypes
+        if (params.size !in 2..4) return false
+        if (!params.all(::isSafeMouseMethodParam)) return false
+        if (method.returnType == java.lang.Boolean.TYPE || method.returnType == java.lang.Boolean::class.java) return false
+        val numericCount = params.count { isNumericPrimitive(it) || Number::class.java.isAssignableFrom(it) }
+        if (numericCount < 2) return false
+        val name = method.name.lowercase()
+        return clickMethodSignals.any { name.contains(it) } || numericCount == params.size
+    }
+
+    private fun mouseMethodPriority(method: Method): Int {
+        val name = method.name.lowercase()
+        val params = method.parameterTypes
+        val clickName = clickMethodSignals.any { name.contains(it) }
+        return when {
+            clickName && params.size == 3 -> 100
+            clickName && params.size == 2 -> 90
+            params.size == 3 -> 70
+            params.size == 2 -> 60
+            else -> 10
+        }
+    }
+
+    private fun buildMouseArgs(types: kotlin.Array<Class<*>>, hitX: Double, hitY: Double, button: Int): kotlin.Array<Any>? {
+        if (types.size !in 2..4) return null
+        val args = mutableListOf<Any>()
+        args.add(coerceMouseArg(types[0], hitX) ?: return null)
+        args.add(coerceMouseArg(types[1], hitY) ?: return null)
+        if (types.size >= 3) {
+            args.add(coerceMouseArg(types[2], button.toDouble()) ?: return null)
+        }
+        if (types.size >= 4) {
+            args.add(coerceMouseArg(types[3], 0.0) ?: return null)
+        }
+        return args.toTypedArray()
+    }
+
+    private fun coerceMouseArg(type: Class<*>, value: Double): Any? = when (type) {
+        java.lang.Double.TYPE, java.lang.Double::class.java -> value
+        java.lang.Float.TYPE, java.lang.Float::class.java -> value.toFloat()
+        java.lang.Integer.TYPE, java.lang.Integer::class.java -> value.toInt()
+        java.lang.Long.TYPE, java.lang.Long::class.java -> value.toLong()
+        java.lang.Short.TYPE, java.lang.Short::class.java -> value.toInt().toShort()
+        java.lang.Byte.TYPE, java.lang.Byte::class.java -> value.toInt().toByte()
+        else -> null
     }
 
     private fun invokeHitPredicate(value: Any, hitX: Double, hitY: Double, warnings: MutableList<String>): PredicateHit? {

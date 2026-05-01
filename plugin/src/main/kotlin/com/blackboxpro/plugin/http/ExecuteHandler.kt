@@ -62,6 +62,9 @@ object ExecuteHandler : HttpHandler {
             submit { Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "stop") }
             return gson.toJson(ResponseMessage(command.id, "success", "Server stop initiated"))
         }
+        if (ServerGermActions.canHandle(command.action)) {
+            return gson.toJson(ServerGermActions.handle(command))
+        }
 
         return try {
             when (BlackBoxSettings.testMode.lowercase()) {

@@ -1,5 +1,25 @@
 # BlackBoxPro 时间轴
 
+## 2026-05-01 16:42 +08:00 - Germ clickDos 分支最终复核与 test-cell 清理
+
+- 当前阶段：`codex/germ-hit-test-dos` 已完成提交前收口验证，准备合并主线。
+- fresh verification：`git diff --check` 无 whitespace error，仅有 Windows line-ending 提示；`JAVA_HOME=C:/Users/Administrator/.gradle/jdks/eclipse_adoptium-17-amd64-windows/jdk-17.0.18+8` 下执行 `common_build plugin_build forge1122_build` 退出码 0。
+- 运行态复核：`cell-01` plugin `/status` ready，mod `/status` ready 且 actions=114；通过 plugin relay 执行 `query_player_state` 成功。
+- Germ 语义复核：`query_germ_screen` 返回 `open=true supported=true`；`germ_gui_part_dos execute=false mode=player_command` 对 `分类商城正式模板/商品2点券` 解析出 `playercmd<->lmshop buy 2 player_points <token>`，未执行副作用。
+- 清理记录：已执行 `Invoke-TestCell.ps1 -Mode stop -CellId cell-01` 和 `Release-TestCell.ps1 -CellId cell-01 -Owner codex-lmshop-germ-20260501-continue`；`cell-01 locked=false`，端口 `25570/38080/38081` 无监听。
+- 技能同步：全局 `blackboxpro-local-regression` skill 已补充 `click_germ_component`、`germ_gui_part_dos`、dry-run 无副作用和“语义执行不等于物理点击”的说明。
+
+## 2026-05-01 16:30 +08:00 - Germ clickDos 显式执行与 Lmshop 运行态证据
+
+- 当前阶段：`germ_gui_part_dos` 已从诊断动作推进到可执行 Germ YAML `clickDos` 语义的显式 action。
+- 本段重点：解决 Lmshop Sprint 2 中“自动化坐标点击不触发 Germ clickDos”的测试工具缺口，同时保持 query / dry-run 无副作用。
+- 实现记录：新增服务端侧 `germ_gui_part_dos` action；先查 Germ runtime part，runtime 只暴露 `options` 时回退读取 `plugins/GermPlugin/gui/*.yml`；返回 `rawDos`、`resolvedDos`、`part`、`availableParts`；`execute=false` 只解析，`execute=true` 才执行。
+- 执行模式：`command_util` 调 Germ `CommandUtil.execute(...)`，`packet` 调 `GermPacketAPI.sendGuiDos(...)`，`player_command` 只解析并执行 `playercmd<->...`。
+- 验证记录：`cell-01` relay `query_player_state` 成功；慢速执行 `/gp reload`、`/lmshop open solar`、`/gp open zzzderk 分类商城正式模板` 后 `query_germ_screen open=true`。
+- Lmshop 证据：`商品1金币` dry-run 解析出 `playercmd<->lmshop buy 1 vault <token>`；`command_util` / `packet` 均未触发订单；`player_command` 对 vault 按钮触发 Lmshop 但因本 cell Vault 不可用返回“支付渠道当前不可用: vault”。
+- 成功路径：`商品2点券` dry-run 解析出 `playercmd<->lmshop buy 2 player_points <token>`；`execute=true, mode=player_command` 后订单为 `#4 [DELIVERY_DISPATCHED] category / solar_key / player_points 500`；后续对 `商品1点券` dry-run 后订单仍为 1，证明 dry-run 无副作用。
+- 关键边界：该能力验证的是 Germ YAML `clickDos` 语义执行，不是物理鼠标点击；真实坐标点击 / 客户端 Germ 事件仍需后续单独处理。
+
 ## 2026-04-29 18:36 +08:00 - Germ hit-test 只读探针增强
 
 - 当前阶段：`query_germ_hit_test` 已从 action 注册推进到真实 Germ loading GUI 命中验证。

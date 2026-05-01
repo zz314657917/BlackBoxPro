@@ -54,6 +54,8 @@ object BlackBoxTestCatalog {
         "move_mouse",
         "click_mouse",
         "click_screen_at",
+        "click_germ_component",
+        "germ_gui_part_dos",
         "type_text",
         "leave_bed",
         "horse_jump_start",
@@ -374,7 +376,7 @@ object BlackBoxTestCatalog {
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("该 action 用于启动前连接流程，不纳入 run_test 全量回放"))
             "close_screen" ->
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("需要显式打开 GUI；当前 run_test 默认场景不覆盖"))
-            "query_germ_screen", "query_germ_hit_test" ->
+            "query_germ_screen", "query_germ_hit_test", "click_germ_component", "germ_gui_part_dos" ->
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("需要先打开真实 Germ GUI；当前 run_test 默认场景只验证 action 可注册"))
             "create_world", "join_world", "leave_world" ->
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("该 action 属于客户端会话管理，当前 run_test 服务端联调链路不覆盖"))
@@ -560,6 +562,24 @@ object BlackBoxTestCatalog {
             addProperty("maxComponents", 200)
             addProperty("includeFields", true)
         }
+        "click_germ_component" -> JsonObject().apply {
+            addProperty("x", 320.0)
+            addProperty("y", 180.0)
+            addProperty("button", 0)
+            addProperty("clickCount", 1)
+            addProperty("maxDepth", 4)
+            addProperty("maxComponents", 200)
+            addProperty("includeFields", false)
+            addProperty("fallbackScreenClick", false)
+        }
+        "germ_gui_part_dos" -> JsonObject().apply {
+            addProperty("guiName", "default")
+            addProperty("partId", "button")
+            addProperty("dosType", "click")
+            addProperty("execute", false)
+            addProperty("resolvePlaceholders", true)
+            addProperty("mode", "command_util")
+        }
         "query_slot_tooltip" -> JsonObject().apply { addProperty("slot", 0) }
         "screenshot" -> JsonObject().apply {
             addProperty("testId", ctx.testId)
@@ -649,9 +669,10 @@ object BlackBoxTestCatalog {
 
     private fun categoryOf(actionId: String): String = when {
         actionId.startsWith("query_") -> "query"
+        actionId == "germ_gui_part_dos" -> "germ"
         actionId in setOf("look_at", "look_at_entity", "look_at_block", "pathfind_to", "navigate_to", "break_block", "place_block_at", "attack", "use", "open_container", "container_transfer", "drop_inventory", "wait", "batch", "respawn", "craft_recipe") -> "composite"
         actionId in setOf("chat_message", "chat_command") -> "chat"
-        actionId in setOf("client_information", "player_abilities", "resource_pack_response", "screenshot", "move_mouse", "click_mouse", "click_screen_at", "key_press", "type_text", "connect_to_server", "close_screen", "create_world", "join_world", "leave_world") -> "client"
+        actionId in setOf("client_information", "player_abilities", "resource_pack_response", "screenshot", "move_mouse", "click_mouse", "click_screen_at", "click_germ_component", "key_press", "type_text", "connect_to_server", "close_screen", "create_world", "join_world", "leave_world") -> "client"
         actionId in setOf("custom_payload", "tab_complete", "keep_alive", "pong", "debug_sample_subscription", "chunk_batch_received") -> "debug"
         actionId in setOf("player_move", "player_move_look", "player_look", "player_on_ground", "confirm_teleportation", "move_vehicle", "paddle_boat", "player_input") -> "movement"
         actionId in setOf("dig_start", "dig_cancel", "dig_finish", "place_block", "use_item") -> "block"

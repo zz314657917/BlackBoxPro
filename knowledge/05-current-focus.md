@@ -27,7 +27,11 @@
 - Germ 只读探针已推进到：
   - `query_germ_screen`
   - `query_germ_hit_test`
-- `query_germ_hit_test` 已能在真实 `germ_gui_loading` 页面返回 texture、text、gif 的候选 bounds 和 hit 结果；当前仍不提供 `click_germ_component` 这类副作用动作。
+- `query_germ_hit_test` 已能在真实 `germ_gui_loading` 页面返回 texture、text、gif 的候选 bounds 和 hit 结果；query 类 action 必须保持只读。
+- Germ 显式副作用动作已增加：
+  - `click_germ_component`：客户端侧组件点击尝试，仍不纳入默认 `run_test`，在 Lmshop 真页上尚未触发购买。
+  - `germ_gui_part_dos`：服务端侧按 `guiName + partId + dosType` 解析 Germ YAML / runtime part 的 dos，`execute=false` 只解析，`execute=true` 才执行。
+  - `germ_gui_part_dos` 支持 `command_util`、`packet`、`player_command` 模式；当前 Lmshop 证据显示 `command_util` / `packet` 未触发 `/lmshop buy`，`player_command` 可执行 `playercmd<->...` 并生成订单。
 
 ## 已确认的现状差异
 
@@ -44,4 +48,4 @@
 - 改测试时，优先看 `knowledge/03-build-and-verify.md`、`knowledge/06-test-system.md`、`BlackBoxTestCatalog.kt` 和 `BlackBoxTestRunner.kt`。
 - 改构建说明时，以 `build.gradle.kts` 和各模块 `build.gradle.kts` 为准，不直接抄 README。
 - 做 Germ 点击验收时，先用 `query_germ_hit_test` 采样真实业务页面 bounds；隐藏 1.12.2 bot 需要先确认 `pauseOnLostFocus:false`，否则可能自动回到 `GuiIngameMenu`。
-- 只有 bounds 稳定后再设计显式 Germ 点击 hook，不要把点击副作用放进 query action。
+- 物理坐标点击仍要和 `germ_gui_part_dos` 区分：前者验证真实鼠标/Germ 客户端事件，后者验证 Germ YAML `clickDos` 语义执行。不要把 `germ_gui_part_dos` 写成真实物理点击通过。

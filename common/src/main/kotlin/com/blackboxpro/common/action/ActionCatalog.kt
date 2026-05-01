@@ -75,6 +75,8 @@ object ActionCatalog {
         register("move_mouse", "x", "y")
         register("click_mouse", "button", "clickCount")
         register("click_screen_at", "x", "y", "button", "clickCount")
+        register("click_germ_component", "x", "y", "componentId", "button", "clickCount", "maxDepth", "maxComponents", "includeFields", "fallbackScreenClick")
+        register("germ_gui_part_dos", "guiName", "partId", "dosType", "execute", "resolvePlaceholders", "mode")
         register("key_press", "key", "keyCode", "char", "pressTicks")
         register("type_text", "text", "intervalTicks")
         register("connect_to_server", "ip", "port")
