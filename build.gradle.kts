@@ -106,10 +106,9 @@ tasks.register("forge1201_build", execTaskClass, object : Action<Exec> {
         task.description = "build 独立项目 1.20.1 Forge"
         task.workingDir = forge1201ProjectDir
         task.configureLocalJava21IfPresent()
+        task.environment("GRADLE_USER_HOME", file(System.getProperty("user.home")).resolve(".gradle").absolutePath)
         task.commandLine(
             forge1201Gradlew.absolutePath,
-            "-g",
-            forge1201GradleUserHome.absolutePath,
             "--no-daemon",
             "clean",
             "build"
@@ -210,6 +209,10 @@ val collectJars = tasks.register("collectJars", syncTaskClass, object : Action<S
         task.from(fileTree("plugin/build/libs"))
     }
 })
+
+tasks.named("forge1201_build") {
+    finalizedBy(collectJars)
+}
 
 tasks.register("buildAll", object : Action<Task> {
     override fun execute(task: Task) {
