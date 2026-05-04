@@ -112,6 +112,11 @@ object ActionRegistry {
         register("leave_world", LeaveWorldAction())
         register("close_screen", CloseScreenAction())
         register("open_inventory", OpenInventoryAction())
+        register("move_mouse", MoveMouseAction())
+        register("click_mouse", ClickMouseAction())
+        register("click_screen_at", ClickScreenAtAction())
+        register("key_press", KeyPressAction())
+        register("type_text", TypeTextAction())
 
         // === 杩涢樁浜や簰 ===
         register("edit_book", EditBookAction())
@@ -170,6 +175,7 @@ object ActionRegistry {
         register("query_tab_list", QueryTabListAction())
         register("query_scoreboard", QueryScoreboardAction())
         register("query_screen_state", QueryScreenStateAction())
+        register("query_cursor_state", QueryCursorStateAction())
         register("query_boss_bar", QueryBossBarAction())
         register("query_tooltip_state", QueryTooltipStateAction())
         register("query_chat_style", QueryChatStyleAction())

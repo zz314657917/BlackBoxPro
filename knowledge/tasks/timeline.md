@@ -1,5 +1,73 @@
 # BlackBoxPro 时间轴
 
+## 2026-05-03 18:45 +08:00 - P/G/E 稳定主线 workflow 落盘
+
+- 当前阶段：新增 `docs/workflow/status.md`、`docs/workflow/spec.md`、`docs/workflow/tasks/sprint-001.md` 和 `docs/workflow/main-log.md`，把 BlackBoxPro 稳定主线切到 P/G/E contract 流程。
+- 本段重点：Sprint 1 只做 workflow 与真源收口 contract，不改源码、不启动 test-cell、不运行 Minecraft 客户端或服务端。
+- 关键边界：HTTP relay 是当前生产主链；`germ_gui_part_dos` 是 Germ YAML / `clickDos` 语义执行，不等于真实物理点击；多 bot 编排不属于本轮计划，后续应作为 repo 侧 scenario orchestrator 单独设计。
+- 审核记录：`docs/workflow/tasks/sprint-001.md` 已补齐显式 `Task ID` 字段，并通过 Evaluator contract review。
+- QA 记录：新增 `docs/workflow/qa/sprint-001-qa.md`，静态验收通过；`git diff --check` 无 whitespace error，仅有 Windows line-ending warning。当前 phase 为 `done`。
+- 下一步：起草 Sprint 2 contract，聚焦 `cell-20..22` 业务模组 smoke 与 cleanup 证据；Sprint 1 不进入源码实现。
+
+## 2026-05-03 19:05 +08:00 - Sprint 2 mod1122 smoke contract approved
+
+- 当前阶段：`docs/workflow/tasks/sprint-002.md` 已起草并通过 Evaluator review，phase 推进到 `contract-approved`。
+- 本段重点：Sprint 2 固定使用 `F:/mcplugins/mod/CloudStorage/build/libs/cloudstorage-0.1.0-SNAPSHOT.jar` 作为真实 Forge 1.12.2 业务模组 jar，在 `cell-20..22` 池执行 startup 和 smoke。
+- 执行边界：只允许运行 `Run-TestCellMod1122Regression.ps1` 的 `startup` / `smoke`，不改源码、不改 test-cell 脚本、不改 CloudStorage 仓库；不传 `-KeepCell` 或 `-ShowClient`。
+- PASS 条件：两次命令 JSON 均为 `ok=true`，且 cleanup 没有 stop/release error；worker 需写 `docs/workflow/worker-results/bbp-sprint-002-mod1122-smoke-evidence-result.md`。
+- 契约修正：本地 `Invoke-PgeWorker.ps1` 要求 worker report 首行为 `DONE` / `FAILED` / `BLOCKED`，Sprint 2 contract 已按该格式修正。
+
+## 2026-05-03 21:36 +08:00 - Sprint 2 CloudStorage mod1122 smoke 验收完成
+
+- 当前阶段：DeepSeek worker 两轮均因 `error_max_budget_usd` 停止，未写出合格 worker report；按 P/G/E stop rule 停止继续烧 worker 预算，改由 Codex/Evaluator 直接执行已批准 acceptance commands。
+- 契约修正：Sprint 2 contract 已把命令运行根从原仓库绝对路径收口为当前 checkout/worktree root，并把 report 路径修正为 `docs/workflow/worker-results/bbp-sprint-002-mod1122-smoke-evidence-result.md`。
+- 验收记录：固定 jar `F:/mcplugins/mod/CloudStorage/build/libs/cloudstorage-0.1.0-SNAPSHOT.jar` 存在；`startup` 抢到 `cell-20`，`ok=true`，stop/release 成功。
+- smoke 证据：`smoke` 抢到 `cell-20`，`ok=true`；`run_test smoke` 返回 `passed=22 failed=0 skipped=0 total=22 totalMs=8081`，截图 `G:/MC/game/BlackBoxProTestCells/cell-20/.minecraft/versions/bot/screenshots/blackboxpro/zzzderk/integration_smoke_1777814618/001_catalog_screenshot.png` 存在，为 `854x480`、`31762` bytes。
+- cleanup 证据：两轮均未传 `-KeepCell` 或 `-ShowClient`；最终端口 `25720/38200/38201` 监听数为 0，匹配 `cmd/java/javaw` test-cell 进程为 0，release `released=true`。
+- 状态收口：新增 `docs/workflow/qa/sprint-002-qa.md`，`docs/workflow/status.md` phase 推进到 `done`；下一步是起草 Sprint 3 contract，聚焦现代端输入 action 同步与跨版本最小验证。
+
+## 2026-05-03 22:04 +08:00 - Sprint 3 modern input sync contract approved
+
+- 当前阶段：新增 `docs/workflow/tasks/sprint-003.md` 和 `docs/workflow/reviews/sprint-003-contract-review.md`，`docs/workflow/status.md` 推进到 `contract-approved`。
+- 本段重点：Sprint 3 只聚焦现代 `1.21.11` / `1.21.1` 客户端线同步 6 个已在 1.12.2 验证过的输入 action：`move_mouse`、`click_mouse`、`click_screen_at`、`query_cursor_state`、`key_press`、`type_text`。
+- contract 边界：`ActionCatalog` 仍是真源，禁止修改 action id 或参数顺序；禁止改 `mod/1.12.2/**`、`mod/1.20.1/**`、test-cell 脚本、Gradle 文件和全局 `.codex`。
+- 验收口径：静态/构建命令必须跑 `common_build plugin_build mod2111_build mod1211_build`；现代 runtime PASS 只能来自真实 `1.21.x` `/status` 和 smoke，若无真实端点则必须 `BLOCKED`，不能用 `1.20.1` 或 `1.12.2` 证据替代。
+- worker 注意：`Invoke-PgeWorker.ps1 -DryRun` 已能识别 Sprint 3 contract，默认 worktree 为 `E:/codex-worktrees/blackboxpro-dev-2.0/bbp-sprint-003-modern-input-sync`；考虑 Sprint 2 worker 超预算，Sprint 3 建议 code-only first pass 或提高预算后再调用。
+
+## 2026-05-04 05:58 +08:00 - Sprint 3 priority changed to 1.20.1 + 1.12.2
+
+- 当前阶段：用户明确要求优先支持 `1.20.1` 和 `1.12.2`，Sprint 3 从旧的 `1.21.x` modern input sync 改为 `bbp-sprint-003-priority-input-support`。
+- 实现记录：移除旧的 `1.21.x` 临时实现方向，改为给 Forge `1.20.1` 补齐 `move_mouse`、`click_mouse`、`click_screen_at`、`query_cursor_state`、`key_press`、`type_text` 及 `ScreenMouseHelper` / `ScreenKeyboardHelper`。
+- 基线策略：Forge `1.12.2` 已有同名 action 和 helper，本轮不改 `mod/1.12.2/**`，只用 common 测试确认注册和文件仍存在。
+- 构建入口：`forge1201_build` 子 wrapper 需要使用用户级 Gradle cache，避免根 Gradle 环境下误用不兼容的 Gradle 9 child invocation。
+- 待收口：继续跑 fresh `common test`、`common_build plugin_build forge1201_build forge1122_build`、`git diff --check` 和 `git status --short`，再写 Sprint 3 QA report；没有真实 `/status` 和 smoke 前不能声明 runtime PASS。
+
+## 2026-05-04 06:04 +08:00 - Sprint 3 build/static QA passed
+
+- QA 结论：`docs/workflow/qa/sprint-003-qa.md` 首行为 `### PASS: bbp-sprint-003-priority-input-support`；该 PASS 只覆盖 build/static，不覆盖运行态 smoke。
+- 执行命令：`rg -n "move_mouse|click_mouse|click_screen_at|query_cursor_state|key_press|type_text" "mod/1.20.1" "mod/1.12.2" "plugin/src/main/kotlin" "common/src/test/kotlin"` 命中 `1.20.1`、`1.12.2`、plugin wrappers/catalog 和 common tests。
+- 环境前提：当前 shell 默认 `JAVA_HOME=C:/Program Files/Java/jdk1.8.0_481` 会拦住根 Gradle 9；使用 `../.local-tools/temurin21/jdk-21.0.10+7` 后 `.\gradlew.bat -p common test --no-daemon` 通过。
+- 构建证据：同一 Java 21 环境下 `.\gradlew.bat common_build plugin_build forge1201_build forge1122_build --no-daemon` 退出码 0，仅有 Java deprecation / unchecked warnings。
+- 自查证据：`git diff --check` 退出码 0，仅有 LF-to-CRLF warning；denied-path 检查确认 `mod/1.21.11/**`、`mod/1.21.1/**`、`mod/1.12.2/**`、`ActionCatalog` 和 plugin source 无本轮 diff。
+- 运行态状态：候选 `/status` 端口 `38201/38211/38221/38081/38171/38231/38241` 均不可用，本轮未跑 GUI/input smoke，不能声明 `1.20.1` 或 `1.12.2` runtime PASS。
+
+## 2026-05-04 11:09 +08:00 - Sprint 3 priority runtime smoke passed
+
+- QA 结论：`docs/workflow/qa/sprint-003-qa.md` 已从 build/static PASS 补齐为 `1.12.2` 和 `1.20.1` priority-version runtime PASS；`1.21.x` 仍不在本轮范围。
+- 1.12.2 证据：`cell-01` plugin `/status` ready，mod `/status` 为 `actions=114 ready=true`；relay `query_player_state` for `zzzderk` 成功；`GuiInventory` 上 `query_cursor_state`、`move_mouse x=120 y=80`、`click_screen_at`、`key_press A` 成功；`GuiChat` 上 `type_text "bbp runtime 1122"` 返回 `typedCount=16`，`key_press ENTER` 成功。
+- 1.12.2 cleanup：`Invoke-TestCell.ps1 -Mode stop -CellId cell-01` 返回 freed `25570/38080/38081=true`；`Release-TestCell.ps1` 返回 `released=true`；复查无监听端口和无匹配 `cmd/java/javaw` 进程。
+- 1.20.1 证据：`Sync-TestCell1201Artifacts.ps1 -CellIds cell-06` 同步新 jar；`cell-06` plugin `/status` ready，mod `/status` 为 `actions=122 ready=true`；relay `query_player_state` for `bot_player` 成功；`InventoryScreen` 上 `query_cursor_state`、`move_mouse x=120 y=80`、`click_screen_at`、`key_press A` 成功；`ChatScreen` 上 `type_text "bbp runtime 1201"` 返回 `typedCount=16`，`key_press ENTER` 成功。
+- 1.20.1 修复：第一次 runtime 用旧 root `build/libs` jar 时新 action 返回 `Unknown action`，已通过 `collectJars` 纠正，并让 `forge1201_build` 自动 `finalizedBy(collectJars)`；第一次新 action runtime 又暴露 `Failed to resolve window metrics`，已把 `ScreenMouseHelper` 改为直接读取 Mojang `Window` API。
+- 1.20.1 cleanup：`Invoke-TestCell1201.ps1 -Mode stop -CellId cell-06` 返回 freed `25615/38130/38131=true`；`Release-TestCell.ps1 -ConfigPath cells-1201.json` 返回 `released=true`；复查无监听端口和无匹配 `cmd/java/javaw` 进程。
+- 本地环境备注：隐藏 1.20.1 chat smoke 需要 `cell-06` 的本地 `options.txt` 为 `pauseOnLostFocus:false`；这是 test-cell 本地运行态设置，不是仓库文件。
+
+## 2026-05-04 11:23 +08:00 - Sprint 3 final sanity and handoff alignment
+
+- fresh verification：`git diff --check` 退出码 0，仅有 Windows LF-to-CRLF warning；denied-path 检查确认 `mod/1.21.11/**`、`mod/1.21.1/**`、`mod/1.12.2/**`、`ActionCatalog` 和 plugin source 无本轮 diff。
+- fresh verification：`JAVA_HOME=../.local-tools/temurin21/jdk-21.0.10+7` 下 `.\gradlew.bat -p common test --no-daemon` 通过，`.\gradlew.bat common_build plugin_build forge1201_build forge1122_build --no-daemon` 退出码 0。
+- fresh verification：目标 action 静态搜索命中 `mod/1.20.1`、`mod/1.12.2`、plugin wrappers/catalog 和 common tests。
+- handoff：`knowledge/tasks/current-task.md` 已把旧的“runtime 未执行，不能声明 PASS”待验证项改为 Sprint 3 priority-version runtime PASS，并明确 `1.21.x` 与 multi-bot 仍需后续单独开计划。
+
 ## 2026-05-01 16:42 +08:00 - Germ clickDos 分支最终复核与 test-cell 清理
 
 - 当前阶段：`codex/germ-hit-test-dos` 已完成提交前收口验证，准备合并主线。

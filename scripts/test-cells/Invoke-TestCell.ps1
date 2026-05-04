@@ -277,7 +277,7 @@ function Start-Server {
 
     $arg = '/c start "" /min cmd /k "' + $inner + '"'
     Start-Process -FilePath 'cmd.exe' -ArgumentList $arg -WindowStyle Hidden -RedirectStandardOutput $serverStdout -RedirectStandardError $serverStderr | Out-Null
-    return (Wait-ForPorts -Ports @($cell.serverPort, $cell.pluginHttpPort) -TimeoutSec 120)
+    return (Wait-ForPorts -Ports @($cell.serverPort, $cell.pluginHttpPort) -TimeoutSec 240)
 }
 
 function Get-BotProcess {
@@ -556,7 +556,16 @@ function Ensure-Bot {
 
     if (-not $proc -or -not $modPort) {
         if ($NoAutoStartBot) {
-            Add-Error "Bot for $($cell.id) is not ready and -NoAutoStartBot was set."
+            $result.steps.bot = [ordered]@{
+                processId = if (Get-BotProcess) { (Get-BotProcess).ProcessId } else { $null }
+                started = $false
+                skipped = $true
+                reason = 'NoAutoStartBot'
+                connectResult = $null
+                statusBefore = Invoke-JsonRequest -Uri $ModStatusUrl -TimeoutSec 5
+                statusAfter = Invoke-JsonRequest -Uri $ModStatusUrl -TimeoutSec 5
+            }
+            return
         } else {
             $started = Start-Bot
             if (-not $started) {
