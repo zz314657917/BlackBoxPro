@@ -81,9 +81,9 @@ Priority input actions:
 
 ## Follow-Up Sprints
 
-Sprint 5 should expand Forge 1.12.2 business-mod evidence from the current `cell-20` proof to a `cell-20/21/22` matrix. The deliverable is fixed CloudStorage startup/smoke evidence on all three cells, per-cell stop/release evidence, final port/process cleanup checks, and clear reporting for any cell-specific blocker.
+Sprint 5 expanded Forge 1.12.2 business-mod evidence from the earlier `cell-20` proof to a `cell-20/21/22` matrix. It is now done with fixed CloudStorage startup/smoke evidence on all three cells, per-cell stop/release evidence, final port/process cleanup checks, and clear reporting for the repaired `cell-21` environment drift.
 
-Sprint 6 should focus on Germ real physical click enhancement. The goal is client event/component clicking evidence, not another semantic `clickDos` shortcut. `germ_gui_part_dos` must remain documented as semantic execution only.
+Sprint 6 focuses on Germ real physical click enhancement. The goal is client event/component clicking evidence plus an observable business side effect, not another semantic `clickDos` shortcut. `germ_gui_part_dos` must remain documented as semantic execution only.
 
 Sprint 7 should introduce a repo-side multi-bot scenario orchestrator. The intended route is:
 

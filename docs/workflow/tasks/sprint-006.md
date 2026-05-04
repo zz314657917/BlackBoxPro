@@ -1,0 +1,271 @@
+# Task Contract: bbp-sprint-006-germ-real-physical-click
+
+## Task ID
+
+`bbp-sprint-006-germ-real-physical-click`
+
+## Role
+
+Developer Generator. Codex remains the final Evaluator.
+
+## Goal
+
+Enhance the Forge `1.12.2` Germ physical click path so `click_germ_component` can produce real client-side click evidence on a Germ GUI.
+
+This sprint must prove a client event or component click path, screen coordinates, component bounds, and an observable business side effect. It must not use `germ_gui_part_dos execute=true` as the proof path.
+
+## Success Criteria
+
+- `click_germ_component` remains the action under test; do not add a new action id and do not change `ActionCatalog`.
+- `query_germ_screen` and `query_germ_hit_test` remain read-only.
+- `germ_gui_part_dos` remains documented and treated as semantic `clickDos` execution only.
+- `click_germ_component` result data records:
+  - resolved target component id or class
+  - selected screen coordinate
+  - target bounds or bounds source
+  - click path attempted
+  - client method or screen event invocation evidence
+  - warnings or failed candidate methods when present
+- Runtime PASS requires a real Germ page, preferably the existing Lmshop Germ page or a fixed local Germ test page with a visible business side effect.
+- Runtime PASS must include before/after evidence that the real click changed business state, such as a new order, balance change, GUI state change, or another stable side effect.
+- A successful `click_germ_component` response without a business side effect is not enough for PASS.
+- If no real Germ page or business side-effect observer is available, report `BLOCKED`; do not substitute `germ_gui_part_dos`.
+- Multi-bot orchestration remains out of scope.
+
+## Allowed Paths
+
+Implementation worker:
+
+- `mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/action/client/ClickGermComponentAction.kt`
+- `mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/util/GermScreenProbeHelper.kt`
+- `mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/util/ScreenMouseHelper.kt`
+- `plugin/src/main/kotlin/com/blackboxpro/plugin/api/action/MouseActions.kt`
+- `plugin/src/main/kotlin/com/blackboxpro/plugin/command/testframework/BlackBoxTestCatalog.kt`
+- `common/src/test/kotlin/com/blackboxpro/common/action/ActionCatalogGermHitTestTest.kt`
+- `docs/workflow/worker-results/**`
+- `docs/workflow/qa/**`
+
+Codex/Evaluator:
+
+- `docs/workflow/**`
+- `knowledge/tasks/current-task.md`
+- `knowledge/tasks/timeline.md`
+
+## Denied Paths
+
+- `common/src/main/kotlin/com/blackboxpro/common/action/ActionCatalog.kt`
+- `common/src/main/kotlin/**`
+- `mod/1.20.1/**`
+- `mod/1.21.1/**`
+- `mod/1.21.11/**`
+- `plugin/src/main/kotlin/com/blackboxpro/plugin/http/ServerGermActions.kt`
+- `scripts/test-cells/**`
+- `build.gradle.kts`
+- `settings.gradle.kts`
+- `gradle.properties`
+- `C:/Users/Administrator/.codex/**`
+- any Lmshop, GermPlugin, test-cell baseline, or external plugin repository file
+
+## Runtime Inputs
+
+- Primary runtime target: 1.12.2 managed test-cell pool, preferably `cell-01` if it still has the known Germ/Lmshop setup.
+- Primary ports for `cell-01`:
+  - server: `25570`
+  - plugin HTTP: `38080`
+  - mod HTTP: `38081`
+- Target player: `zzzderk` unless the acquired cell config says otherwise.
+- Known diagnostic actions:
+  - `query_germ_screen`
+  - `query_germ_hit_test`
+  - `click_germ_component`
+  - `germ_gui_part_dos execute=false` only for semantic comparison.
+
+## Acceptance Commands
+
+Static and build checks:
+
+```powershell
+rg -n "click_germ_component|query_germ_hit_test|query_germ_screen|germ_gui_part_dos" "mod/1.12.2" "plugin/src/main/kotlin" "common/src/test/kotlin" "knowledge" "docs/workflow"
+```
+
+```powershell
+.\gradlew.bat -p common test --no-daemon
+```
+
+```powershell
+.\gradlew.bat common_build plugin_build forge1122_build --no-daemon
+```
+
+Denied-path checks:
+
+```powershell
+git diff --name-only -- "common/src/main/kotlin/com/blackboxpro/common/action/ActionCatalog.kt" "common/src/main/kotlin" "mod/1.20.1" "mod/1.21.1" "mod/1.21.11" "plugin/src/main/kotlin/com/blackboxpro/plugin/http/ServerGermActions.kt" "scripts/test-cells" "build.gradle.kts" "settings.gradle.kts" "gradle.properties"
+```
+
+Expected result for denied-path check: no output.
+
+```powershell
+git diff --check
+git status --short
+```
+
+Runtime setup for primary cell:
+
+```powershell
+$owner = "bbp-sprint-006-germ-real-click"
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Acquire-TestCell.ps1" -CellId cell-01 -Owner $owner -ReadyOnly
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode ensure -CellId cell-01
+Invoke-RestMethod -Uri "http://127.0.0.1:38080/status" -Method GET
+Invoke-RestMethod -Uri "http://127.0.0.1:38081/status" -Method GET
+```
+
+Relay sanity check:
+
+```powershell
+$body = @{
+  id = "sprint-006-relay-check"
+  action = "query_player_state"
+  target = "zzzderk"
+  params = @{}
+} | ConvertTo-Json -Depth 8
+Invoke-RestMethod -Uri "http://127.0.0.1:38080/execute" -Method POST -ContentType "application/json; charset=utf-8" -Body $body
+```
+
+Open a real Germ business page. Use the existing Lmshop path when available, and record the exact command that worked:
+
+```powershell
+$body = @{
+  id = "sprint-006-open-germ-page"
+  action = "chat_command"
+  target = "zzzderk"
+  params = @{
+    command = "lmshop open solar"
+  }
+} | ConvertTo-Json -Depth 8
+Invoke-RestMethod -Uri "http://127.0.0.1:38080/execute" -Method POST -ContentType "application/json; charset=utf-8" -Body $body
+```
+
+Confirm the Germ page and target bounds before clicking:
+
+```powershell
+$body = @{
+  id = "sprint-006-query-germ"
+  action = "query_germ_screen"
+  params = @{
+    maxDepth = 8
+    maxComponents = 500
+    includeFields = $true
+  }
+} | ConvertTo-Json -Depth 10
+Invoke-RestMethod -Uri "http://127.0.0.1:38081/execute" -Method POST -ContentType "application/json" -Body $body
+```
+
+```powershell
+$body = @{
+  id = "sprint-006-hit-test"
+  action = "query_germ_hit_test"
+  params = @{
+    x = <target-x>
+    y = <target-y>
+    maxDepth = 8
+    maxComponents = 500
+    includeFields = $true
+  }
+} | ConvertTo-Json -Depth 10
+Invoke-RestMethod -Uri "http://127.0.0.1:38081/execute" -Method POST -ContentType "application/json" -Body $body
+```
+
+Dry-run semantic comparison is allowed only with `execute=false`:
+
+```powershell
+$body = @{
+  id = "sprint-006-dos-dry-run"
+  action = "germ_gui_part_dos"
+  target = "zzzderk"
+  params = @{
+    guiName = "<gui-name>"
+    partId = "<part-id>"
+    dosType = "click"
+    execute = $false
+    resolvePlaceholders = $true
+    mode = "player_command"
+  }
+} | ConvertTo-Json -Depth 12
+Invoke-RestMethod -Uri "http://127.0.0.1:38080/execute" -Method POST -ContentType "application/json; charset=utf-8" -Body $body
+```
+
+Execute the real click:
+
+```powershell
+$body = @{
+  id = "sprint-006-click-germ-component"
+  action = "click_germ_component"
+  params = @{
+    x = <target-x>
+    y = <target-y>
+    button = 0
+    clickCount = 1
+    maxDepth = 8
+    maxComponents = 500
+    includeFields = $true
+    fallbackScreenClick = $true
+  }
+} | ConvertTo-Json -Depth 12
+Invoke-RestMethod -Uri "http://127.0.0.1:38081/execute" -Method POST -ContentType "application/json" -Body $body
+```
+
+After the click, collect business-state evidence with the exact local command or query appropriate to the target Germ page. Do not print secrets. If no stable before/after observer exists, report `BLOCKED`.
+
+Cleanup:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode stop -CellId cell-01
+powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Release-TestCell.ps1" -CellId cell-01 -Owner "bbp-sprint-006-germ-real-click"
+Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 25570,38080,38081 } | Select-Object LocalAddress,LocalPort,OwningProcess
+Get-CimInstance Win32_Process | Where-Object { $_.Name -in "cmd.exe","java.exe","javaw.exe" -and ($_.CommandLine -like "*BlackBoxProTestCells*cell-01*" -or $_.CommandLine -like "*server-cell-01*") } | Select-Object ProcessId,Name,CommandLine
+```
+
+Expected cleanup result: no output from the final port/process checks.
+
+## Constraints
+
+- Do not modify action ids or `ActionCatalog`.
+- Do not implement multi-bot orchestration.
+- Do not change 1.20.1, 1.21.1, or 1.21.11 code.
+- Do not change test-cell scripts or baseline configs.
+- Do not change Lmshop, GermPlugin, or external plugin code.
+- Do not use `germ_gui_part_dos execute=true` for PASS evidence.
+- Do not call `query_germ_hit_test` or `query_germ_screen` in a way that causes side effects.
+- Do not claim PASS from screenshots alone; screenshots can support evidence but must not replace business-state evidence.
+- Hidden-client Germ tests must account for `pauseOnLostFocus:false`; if the page keeps reverting to `GuiIngameMenu`, report environment `BLOCKED`.
+
+## Output
+
+Worker output, if a worker is used:
+
+- `docs/workflow/worker-results/bbp-sprint-006-germ-real-physical-click-result.md`
+- first line `### DONE: bbp-sprint-006-germ-real-physical-click`, `### FAILED: ...`, or `### BLOCKED: ...`
+- changed files
+- exact commands run
+- implementation summary
+- static/build results
+- runtime evidence or blocker
+- denied-path compliance
+- cleanup evidence
+- residual risks
+
+Codex/Evaluator output:
+
+- `docs/workflow/qa/sprint-006-qa.md`
+- first line `### PASS: bbp-sprint-006-germ-real-physical-click`, `### FAIL: ...`, or `### BLOCKED: ...`
+- final PASS/FAIL/BLOCKED decision based on diff review and real evidence
+
+## Stop Rules
+
+- Stop if the repository is not a git repo.
+- Stop if implementation requires changing `ActionCatalog`, test-cell scripts, Gradle files, modern-version modules, or external plugin code.
+- Stop if no real Germ page can be opened.
+- Stop if the only available side-effect path is `germ_gui_part_dos execute=true`.
+- Stop and report `FAIL` if `click_germ_component` returns success but no observable business side effect occurs.
+- Stop and report `BLOCKED` if a business side-effect observer is unavailable after static/build checks pass.
+- Always run cleanup after runtime attempts, even after failure.

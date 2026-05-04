@@ -30,3 +30,5 @@
 260504 2118 | bbp-sprint-005-mod1122-matrix-evidence | cell-21 startup pass after repair | Evaluator | docs/workflow/qa/sprint-005-qa.md
 260504 2120 | bbp-sprint-005-mod1122-matrix-evidence | stale smoke lease released before rerun | Evaluator | scripts/test-cells/Release-TestCell.ps1
 260504 2126 | bbp-sprint-005-mod1122-matrix-evidence | cell-21 smoke pass and cell-22 matrix pass; sprint done | Evaluator | docs/workflow/qa/sprint-005-qa.md
+260504 2310 | bbp-sprint-006-germ-real-physical-click | contract drafted | Planner | docs/workflow/tasks/sprint-006.md
+260504 2310 | bbp-sprint-006-germ-real-physical-click | contract approved | Evaluator | docs/workflow/reviews/sprint-006-contract-review.md

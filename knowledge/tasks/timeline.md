@@ -1,5 +1,14 @@
 # BlackBoxPro 时间轴
 
+## 2026-05-04 23:10 +08:00 - Sprint 6 Germ real click contract approved
+
+- 当前阶段：P/G/E 已从 Sprint 5 `done` 推进到 Sprint 6 `contract-approved`。
+- 本段重点：新增 `docs/workflow/tasks/sprint-006.md`，目标是增强 `click_germ_component` 的真实客户端/Germ 点击路径，并用真实 Germ 页面业务副作用验收。
+- 审核记录：新增 `docs/workflow/reviews/sprint-006-contract-review.md`，verdict 为 `APPROVED`。
+- 关键边界：`germ_gui_part_dos execute=true` 仍只能证明 Germ YAML `clickDos` 语义执行，不能作为物理点击 PASS 证据。
+- 验收口径：PASS 必须包含 screen coordinate、component bounds、client event/method invocation 和业务 before/after；没有真实页面或副作用观测时应报 `BLOCKED`。
+- 下一步：按 Sprint 6 contract 实现或调用 bounded developer worker，随后跑 static/build/runtime QA 并写 `docs/workflow/qa/sprint-006-qa.md`。
+
 ## 2026-05-04 21:26 +08:00 - Sprint 5 mod1122 matrix recovered and passed
 
 - 当前阶段：Sprint 5 已从 `qa` 收口为 `done`，`docs/workflow/qa/sprint-005-qa.md` 首行已更新为 `### PASS: bbp-sprint-005-mod1122-matrix-evidence`。
