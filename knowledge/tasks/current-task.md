@@ -9,7 +9,7 @@
 ## 当前目标
 
 - 使用 `docs/workflow/status.md` 作为 P/G/E 状态入口，把 BlackBoxPro 稳定主线拆成可审核、可交给 worker 的 Sprint contract。
-- 当前 P/G/E 已完成 Sprint 4 `bbp-sprint-004-modern-input-sync`：`1.21.11` / `1.21.1` Fabric + NeoForge 已同步六个输入 action，并完成 build/static QA。
+- 当前 P/G/E 已进入 Sprint 5 `contract-approved`：目标是用固定 CloudStorage jar 在 `cell-20/21/22` 完成 Forge 1.12.2 业务模组 startup + smoke 全矩阵运行态证据。
 - 把已经验证过的 test-cell / Germ / BC 能力收口到主线。
 - 收口本轮 Lmshop Germ 验收辅助能力：`germ_gui_part_dos` 已能从 Germ YAML 解析 `clickDos`，并用显式 `player_command` 模式复现玩家命令按钮语义。
 - 保持 `knowledge/` 作为下一次会话的接手入口。
@@ -38,6 +38,10 @@
   - `1.21.11` Fabric + NeoForge 已新增 `move_mouse`、`click_mouse`、`click_screen_at`、`query_cursor_state`、`key_press`、`type_text` 实现与 registry 注册。
   - `1.21.1` Fabric + NeoForge 已新增同组六个 action 实现与 registry 注册。
   - `ActionCatalog`、plugin source、`1.20.1`、`1.12.2`、test-cell 脚本和 Gradle 配置均未改。
+- Sprint 5 contract：
+  - 新增 `docs/workflow/tasks/sprint-005.md`，要求 `cell-20`、`cell-21`、`cell-22` 均使用固定 CloudStorage jar 跑 `startup` 和 `smoke`。
+  - 新增 `docs/workflow/reviews/sprint-005-contract-review.md`，verdict 为 `APPROVED`。
+  - Contract 只允许测试 worker 写 `docs/workflow/worker-results/**` 或 `docs/workflow/qa/**`；不允许改源码、Gradle、test-cell 脚本、CloudStorage 或全局 `.codex`。
 - 1.12.2 普通 test-cell 池：
   - `cell-01..05` 统一作为 Germ + BC 后端回归池。
   - 服务端公共基线包含 `BlackBoxPro-Plugin`、`PlayerCurrency`、`PlayerPoints`、`LuckPerms`、`GermPlugin`、`Vault`、`PlaceholderAPI`、`ProtocolLib`。
@@ -75,12 +79,13 @@
 - Sprint 3 已补齐 `1.20.1` / `1.12.2` 的真实 `/status` + GUI/input runtime smoke，当前可声明 priority-version runtime PASS。
 - Sprint 4 已完成 build/static QA；`1.21.11` / `1.21.1` runtime smoke 因无真实同版本 `/status` endpoint，仍为 `BLOCKED` / 未验证。
 - untracked `java_pid53476.hprof` 已在 Sprint 4 分支清理阶段确认路径后删除；它来自一次 OOM build 尝试，不属于交付内容。
+- Sprint 5 尚未执行 runtime matrix；不能声明 `cell-20/21/22` 全矩阵 PASS。
 
 ## 下一步
 
-1. 起草 Sprint 5 contract：`cell-20/21/22` Forge 1.12.2 业务模组矩阵验证；验收要包含 startup/smoke、截图或 `/status` 证据、stop/release 和端口/进程 cleanup。
-2. 整理/提交当前 Sprint 4 分支，然后按需要合并回 `main`。
-3. 如需声明 `1.21.x` runtime PASS，先准备真实 `1.21.11` / `1.21.1` Fabric 或 NeoForge endpoint，再跑同版本 `/status` + GUI/input smoke。
+1. 执行或委派 Sprint 5 acceptance commands：按 `cell-20`、`cell-21`、`cell-22` 顺序跑 CloudStorage `startup` + `smoke`，每轮必须自动 stop/release。
+2. 写 `docs/workflow/qa/sprint-005-qa.md`，逐格记录 `ok=true`、run_test totals、截图或 `/status` 证据、cleanup 和 denied-path compliance。
+3. 如任一 cell 失败，先做 cleanup，再按 contract 报 `FAIL` / `BLOCKED`，不要用其他 cell 代替。
 4. Sprint 6 单独处理 Germ 真实物理点击；不要把 `germ_gui_part_dos` 当物理点击证明。
 5. Sprint 7 单独处理多 bot scenario orchestrator；当前仍是一客户端进程对应一个玩家身份。
 
@@ -100,6 +105,7 @@
 - 2026-05-04 Sprint 4 build/static QA 通过：新增 `1.21.11` / `1.21.1` Fabric + NeoForge 六个输入 action/helper 与 registry 注册；`.\gradlew.bat -p common test --no-daemon` 通过；`JAVA_TOOL_OPTIONS=-Xmx8g` 下 `.\gradlew.bat common_build plugin_build mod2111_build mod1211_build --no-daemon` 通过；denied-path diff 对 `mod/1.20.1`、`mod/1.12.2`、`ActionCatalog`、plugin source 和 test-cell scripts 无输出；`git diff --check` 仅有 Windows LF-to-CRLF warning。
 - 2026-05-04 Sprint 4 runtime 未验证：没有真实 `1.21.11` / `1.21.1` `/status` endpoint，因此不能声明现代端 runtime PASS；已写入 `docs/workflow/qa/sprint-004-qa.md`。
 - 2026-05-04 Sprint 4 分支清理：确认 `java_pid53476.hprof` 是仓库根下单文件后已删除；该文件未纳入提交。
+- 2026-05-04 Sprint 5 contract 已起草并审核通过：`docs/workflow/tasks/sprint-005.md`、`docs/workflow/reviews/sprint-005-contract-review.md`；当前 `docs/workflow/status.md` phase 为 `contract-approved`；下一步可直接执行矩阵验收或调用测试 worker。
 - 2026-04-24 到 2026-04-29 已多次执行 `common test`、`forge1122_build`、`plugin build`、test-cell startup、BC smoke、Germ hit-test 和 smoke 回归；详细历史见 `knowledge/tasks/timeline.md`。
 - 2026-05-01 已执行 `common_build plugin_build`，并在 `cell-01` 通过 relay、Germ 页面打开、`germ_gui_part_dos` dry-run、`player_command` 成功购买和 dry-run 无副作用验证。
 - 本轮分支整理前已执行 `git diff --check`，仅有 Windows line-ending 提示，无 whitespace error。

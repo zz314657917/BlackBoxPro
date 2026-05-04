@@ -22,3 +22,5 @@
 260504 1745 | bbp-sprint-004-modern-input-sync | build and static qa pass; runtime blocked | Evaluator | docs/workflow/qa/sprint-004-qa.md
 260504 1745 | bbp-sprint-004-modern-input-sync | sprint done and handoff aligned | Evaluator | knowledge/tasks/current-task.md
 260504 1805 | bbp-sprint-004-modern-input-sync | local heap dump cleanup | Evaluator | java_pid53476.hprof removed
+260504 1810 | bbp-sprint-005-mod1122-matrix-evidence | contract drafted | Planner | docs/workflow/tasks/sprint-005.md
+260504 1810 | bbp-sprint-005-mod1122-matrix-evidence | contract approved | Evaluator | docs/workflow/reviews/sprint-005-contract-review.md

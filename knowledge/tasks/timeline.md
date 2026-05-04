@@ -1,5 +1,15 @@
 # BlackBoxPro 时间轴
 
+## 2026-05-04 18:10 +08:00 - Sprint 5 mod1122 matrix contract approved
+
+- 当前阶段：P/G/E 已从 Sprint 4 `done` 推进到 Sprint 5 `contract-approved`。
+- 本段重点：新增 `docs/workflow/tasks/sprint-005.md`，目标是固定 CloudStorage jar 在 `cell-20/21/22` 全矩阵跑 Forge 1.12.2 business-mod `startup` + `smoke`。
+- 已完成：新增 `docs/workflow/reviews/sprint-005-contract-review.md`，verdict 为 `APPROVED`；`docs/workflow/status.md` 已切到 `bbp-sprint-005-mod1122-matrix-evidence`。
+- 关键决策：Sprint 5 补 Sprint 2 缺口，必须三格都通过；`cell-20` 单格证据不能替代 `cell-21/22`。
+- 验证记录：本阶段只做 contract 和 handoff 文档，不启动 Minecraft、不运行 test-cell。
+- 遗留问题：Sprint 5 runtime matrix 尚未执行，不能声明全矩阵 PASS。
+- 下一步：顺序执行或委派 `cell-20`、`cell-21`、`cell-22` 的 CloudStorage startup/smoke acceptance commands，并写 `docs/workflow/qa/sprint-005-qa.md`。
+
 ## 2026-05-04 18:05 +08:00 - Sprint 4 branch cleanup
 
 - 当前阶段：Sprint 4 已完成 QA 收口，并进入分支提交前清理。
