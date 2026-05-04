@@ -57,6 +57,40 @@ Expected outcomes:
 - Verification includes common tests, priority-version builds, static action search, and runtime smoke only when a real same-version endpoint is available.
 - `1.21.11` / `1.21.1` input action implementation is deferred to a later sprint.
 
+## Sprint 4: Modern Client Input Sync
+
+Goal: sync the validated priority input action model into the modern `1.21.11` and `1.21.1` client lines.
+
+Expected outcomes:
+
+- `1.21.11` Fabric and NeoForge can register and execute the six priority input actions.
+- `1.21.1` Fabric and NeoForge can register and execute the six priority input actions.
+- Shared modern runtime code is preferred where it fits the existing module split.
+- `1.20.1` and `1.12.2` remain untouched baselines.
+- `ActionCatalog` remains unchanged.
+- Verification includes common tests, modern build tasks, denied-path review, and same-version runtime smoke only when a real endpoint exists.
+
+Priority input actions:
+
+- `move_mouse`
+- `click_mouse`
+- `click_screen_at`
+- `query_cursor_state`
+- `key_press`
+- `type_text`
+
+## Follow-Up Sprints
+
+Sprint 5 should expand Forge 1.12.2 business-mod evidence from the current `cell-20` proof to a `cell-20/21/22` matrix. The deliverable should be startup/smoke evidence, cleanup evidence, and clear reporting for any cell-specific blocker.
+
+Sprint 6 should focus on Germ real physical click enhancement. The goal is client event/component clicking evidence, not another semantic `clickDos` shortcut. `germ_gui_part_dos` must remain documented as semantic execution only.
+
+Sprint 7 should introduce a repo-side multi-bot scenario orchestrator. The intended route is:
+
+`scenario.yml/json -> acquire multiple cells -> dispatch actions per bot endpoint -> aggregate evidence -> cleanup`
+
+This remains a future contract. Sprint 4 does not implement multi-bot orchestration.
+
 ## Multi-Bot Boundary
 
 Multi-bot orchestration is not part of this roadmap.

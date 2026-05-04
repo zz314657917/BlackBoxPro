@@ -33,7 +33,11 @@ class PriorityInputActionSupportTest {
         val root = repoRoot()
         val registryFiles = listOf(
             "mod/1.20.1/src/main/kotlin/com/blackboxpro/forge/dispatcher/ActionRegistry.kt",
-            "mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/dispatcher/ActionRegistry.kt"
+            "mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/dispatcher/ActionRegistry.kt",
+            "mod/1.21.11/runtime/src/main/kotlin/com/blackboxpro/neoforge/dispatcher/ActionRegistry.kt",
+            "mod/1.21.11/fabric/src/main/kotlin/com/blackboxpro/fabric/dispatcher/ActionRegistry.kt",
+            "mod/1.21.1/runtime/src/main/kotlin/com/blackboxpro/neoforge/dispatcher/ActionRegistry.kt",
+            "mod/1.21.1/fabric/src/main/kotlin/com/blackboxpro/fabric/dispatcher/ActionRegistry.kt"
         )
 
         registryFiles.forEach { relativePath ->
@@ -60,6 +64,10 @@ class PriorityInputActionSupportTest {
             ).forEach { name ->
                 add("mod/1.20.1/src/main/kotlin/com/blackboxpro/forge/action/client/$name")
                 add("mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/action/client/$name")
+                add("mod/1.21.11/runtime/src/main/kotlin/com/blackboxpro/neoforge/action/client/$name")
+                add("mod/1.21.11/fabric/src/main/kotlin/com/blackboxpro/fabric/action/client/$name")
+                add("mod/1.21.1/runtime/src/main/kotlin/com/blackboxpro/neoforge/action/client/$name")
+                add("mod/1.21.1/fabric/src/main/kotlin/com/blackboxpro/fabric/action/client/$name")
             }
             add("mod/1.20.1/src/main/kotlin/com/blackboxpro/forge/action/query/QueryCursorStateAction.kt")
             add("mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/action/query/QueryCursorStateAction.kt")
@@ -67,6 +75,18 @@ class PriorityInputActionSupportTest {
             add("mod/1.20.1/src/main/kotlin/com/blackboxpro/forge/util/ScreenKeyboardHelper.kt")
             add("mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/util/ScreenMouseHelper.kt")
             add("mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/util/ScreenKeyboardHelper.kt")
+            add("mod/1.21.11/runtime/src/main/kotlin/com/blackboxpro/neoforge/action/query/QueryCursorStateAction.kt")
+            add("mod/1.21.11/fabric/src/main/kotlin/com/blackboxpro/fabric/action/query/QueryCursorStateAction.kt")
+            add("mod/1.21.1/runtime/src/main/kotlin/com/blackboxpro/neoforge/action/query/QueryCursorStateAction.kt")
+            add("mod/1.21.1/fabric/src/main/kotlin/com/blackboxpro/fabric/action/query/QueryCursorStateAction.kt")
+            add("mod/1.21.11/runtime/src/main/kotlin/com/blackboxpro/neoforge/util/ScreenMouseHelper.kt")
+            add("mod/1.21.11/runtime/src/main/kotlin/com/blackboxpro/neoforge/util/ScreenKeyboardHelper.kt")
+            add("mod/1.21.11/fabric/src/main/kotlin/com/blackboxpro/fabric/util/ScreenMouseHelper.kt")
+            add("mod/1.21.11/fabric/src/main/kotlin/com/blackboxpro/fabric/util/ScreenKeyboardHelper.kt")
+            add("mod/1.21.1/runtime/src/main/kotlin/com/blackboxpro/neoforge/util/ScreenMouseHelper.kt")
+            add("mod/1.21.1/runtime/src/main/kotlin/com/blackboxpro/neoforge/util/ScreenKeyboardHelper.kt")
+            add("mod/1.21.1/fabric/src/main/kotlin/com/blackboxpro/fabric/util/ScreenMouseHelper.kt")
+            add("mod/1.21.1/fabric/src/main/kotlin/com/blackboxpro/fabric/util/ScreenKeyboardHelper.kt")
         }
 
         implementationFiles.forEach { relativePath ->

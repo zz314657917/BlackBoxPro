@@ -17,3 +17,8 @@
 260504 0604 | bbp-sprint-003-priority-input-support | build and static qa pass | Evaluator | docs/workflow/qa/sprint-003-qa.md
 260504 1109 | bbp-sprint-003-priority-input-support | 1.12.2 and 1.20.1 runtime smoke pass | Evaluator | docs/workflow/qa/sprint-003-qa.md
 260504 1123 | bbp-sprint-003-priority-input-support | final sanity pass and handoff aligned | Evaluator | knowledge/tasks/current-task.md
+260504 1553 | bbp-sprint-004-modern-input-sync | contract drafted | Planner | docs/workflow/tasks/sprint-004.md
+260504 1553 | bbp-sprint-004-modern-input-sync | contract approved | Evaluator | docs/workflow/reviews/sprint-004-contract-review.md
+260504 1745 | bbp-sprint-004-modern-input-sync | build and static qa pass; runtime blocked | Evaluator | docs/workflow/qa/sprint-004-qa.md
+260504 1745 | bbp-sprint-004-modern-input-sync | sprint done and handoff aligned | Evaluator | knowledge/tasks/current-task.md
+260504 1805 | bbp-sprint-004-modern-input-sync | local heap dump cleanup | Evaluator | java_pid53476.hprof removed

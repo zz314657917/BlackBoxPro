@@ -108,6 +108,11 @@ object ActionRegistry {
         register("leave_world", LeaveWorldAction())
         register("close_screen", CloseScreenAction())
         register("open_inventory", OpenInventoryAction())
+        register("move_mouse", MoveMouseAction())
+        register("click_mouse", ClickMouseAction())
+        register("click_screen_at", ClickScreenAtAction())
+        register("key_press", KeyPressAction())
+        register("type_text", TypeTextAction())
 
         // === 进阶交互 ===
         register("edit_book", EditBookAction())
@@ -170,6 +175,7 @@ object ActionRegistry {
         register("query_tooltip_state", QueryTooltipStateAction())
         register("query_chat_style", QueryChatStyleAction())
         register("query_slot_tooltip", QuerySlotTooltipAction())
+        register("query_cursor_state", QueryCursorStateAction())
 
         // === 玩家动作（新增）===
         register("jump", JumpAction())

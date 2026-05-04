@@ -1,5 +1,25 @@
 # BlackBoxPro 时间轴
 
+## 2026-05-04 18:05 +08:00 - Sprint 4 branch cleanup
+
+- 当前阶段：Sprint 4 已完成 QA 收口，并进入分支提交前清理。
+- 本段重点：确认并删除 untracked `java_pid53476.hprof`，避免把 OOM heap dump 混进后续提交或 handoff。
+- 已完成：路径校验确认目标为仓库根下单文件 `F:/mcplugins/BlackBoxPro-dev-2.0/java_pid53476.hprof`，大小约 795MB；随后已移除。
+- 关键决策：heap dump 不是 Sprint 4 交付物，不进入 git；后续只提交现代端输入 action、workflow QA 和 handoff 文档。
+- 验证记录：删除命令后 `Test-Path` 返回 `False`。
+- 遗留问题：无。
+- 下一步：跑 fresh 验证，stage 并提交 Sprint 4 分支。
+
+## 2026-05-04 17:45 +08:00 - Sprint 4 modern input sync QA closed
+
+- 当前阶段：Sprint 4 已从 `contract-approved` 推进到 `done`，QA 报告为 `docs/workflow/qa/sprint-004-qa.md`。
+- 本段重点：`1.21.11` / `1.21.1` Fabric + NeoForge 均已同步 `move_mouse`、`click_mouse`、`click_screen_at`、`query_cursor_state`、`key_press`、`type_text`。
+- 已完成：新增现代端 action/helper 文件与四个 registry 注册；扩展 `PriorityInputActionSupportTest` 覆盖现代 registry 和实现文件存在性。
+- 关键决策：Sprint 4 PASS 只覆盖实现、静态搜索、common test、聚合构建与 denied-path compliance；`1.21.x` runtime PASS 必须等真实同版本 `/status` endpoint。
+- 验证记录：`.\gradlew.bat -p common test --no-daemon` 通过；`JAVA_TOOL_OPTIONS=-Xmx8g` 下 `.\gradlew.bat common_build plugin_build mod2111_build mod1211_build --no-daemon` 通过；denied-path diff 无输出；`git diff --check` 仅有 LF-to-CRLF warning。
+- 遗留问题：`1.21.11` / `1.21.1` runtime smoke 未跑，状态为 `BLOCKED` / 未验证。
+- 下一步：整理提交 Sprint 4 分支；随后起草 Sprint 5 contract，做 `cell-20/21/22` Forge 1.12.2 业务模组矩阵验证。
+
 ## 2026-05-03 18:45 +08:00 - P/G/E 稳定主线 workflow 落盘
 
 - 当前阶段：新增 `docs/workflow/status.md`、`docs/workflow/spec.md`、`docs/workflow/tasks/sprint-001.md` 和 `docs/workflow/main-log.md`，把 BlackBoxPro 稳定主线切到 P/G/E contract 流程。
@@ -67,6 +87,15 @@
 - fresh verification：`JAVA_HOME=../.local-tools/temurin21/jdk-21.0.10+7` 下 `.\gradlew.bat -p common test --no-daemon` 通过，`.\gradlew.bat common_build plugin_build forge1201_build forge1122_build --no-daemon` 退出码 0。
 - fresh verification：目标 action 静态搜索命中 `mod/1.20.1`、`mod/1.12.2`、plugin wrappers/catalog 和 common tests。
 - handoff：`knowledge/tasks/current-task.md` 已把旧的“runtime 未执行，不能声明 PASS”待验证项改为 Sprint 3 priority-version runtime PASS，并明确 `1.21.x` 与 multi-bot 仍需后续单独开计划。
+
+## 2026-05-04 15:53 +08:00 - Sprint 4 modern input sync contract drafted
+
+- 当前阶段：`docs/workflow/status.md` 已从 Sprint 3 `done` 推进到 Sprint 4 `contract-approved`。
+- 本段重点：新增 `docs/workflow/tasks/sprint-004.md`，目标是把 `1.21.11` / `1.21.1` Fabric + NeoForge 同步到六个 priority input action：`move_mouse`、`click_mouse`、`click_screen_at`、`query_cursor_state`、`key_press`、`type_text`。
+- contract 边界：禁止改 `ActionCatalog`、`1.20.1`、`1.12.2`、plugin source、test-cell 脚本、Gradle 配置和全局 `.codex`；实现优先复用现代 `runtime` 模块，loader 差异只放在 Fabric/NeoForge 边界。
+- 验收口径：静态搜索、common tests、`common_build plugin_build mod2111_build mod1211_build`、denied-path diff 和 `git diff --check` 是基础门；runtime PASS 必须来自真实同版本 `/status` 与 smoke，没有端点就按版本/loader 报 `BLOCKED` 或未验证。
+- 审核记录：新增 `docs/workflow/reviews/sprint-004-contract-review.md`，verdict 为 `APPROVED`。
+- 下一步：进入 implementation，或按 contract 调用 bounded worker。
 
 ## 2026-05-01 16:42 +08:00 - Germ clickDos 分支最终复核与 test-cell 清理
 

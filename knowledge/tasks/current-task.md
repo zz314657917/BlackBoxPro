@@ -9,6 +9,7 @@
 ## 当前目标
 
 - 使用 `docs/workflow/status.md` 作为 P/G/E 状态入口，把 BlackBoxPro 稳定主线拆成可审核、可交给 worker 的 Sprint contract。
+- 当前 P/G/E 已完成 Sprint 4 `bbp-sprint-004-modern-input-sync`：`1.21.11` / `1.21.1` Fabric + NeoForge 已同步六个输入 action，并完成 build/static QA。
 - 把已经验证过的 test-cell / Germ / BC 能力收口到主线。
 - 收口本轮 Lmshop Germ 验收辅助能力：`germ_gui_part_dos` 已能从 Germ YAML 解析 `clickDos`，并用显式 `player_command` 模式复现玩家命令按钮语义。
 - 保持 `knowledge/` 作为下一次会话的接手入口。
@@ -33,6 +34,10 @@
   - 本轮按用户最新优先级先支持 `1.20.1` 和 `1.12.2`，不继续扩 `1.21.x`。
   - `1.20.1` 已新增 `move_mouse`、`click_mouse`、`click_screen_at`、`query_cursor_state`、`key_press`、`type_text` 实现与 registry 注册。
   - `1.12.2` 已有同名 action，当前作为保持不回退的语义基线。
+- Sprint 4 现代端输入 action：
+  - `1.21.11` Fabric + NeoForge 已新增 `move_mouse`、`click_mouse`、`click_screen_at`、`query_cursor_state`、`key_press`、`type_text` 实现与 registry 注册。
+  - `1.21.1` Fabric + NeoForge 已新增同组六个 action 实现与 registry 注册。
+  - `ActionCatalog`、plugin source、`1.20.1`、`1.12.2`、test-cell 脚本和 Gradle 配置均未改。
 - 1.12.2 普通 test-cell 池：
   - `cell-01..05` 统一作为 Germ + BC 后端回归池。
   - 服务端公共基线包含 `BlackBoxPro-Plugin`、`PlayerCurrency`、`PlayerPoints`、`LuckPerms`、`GermPlugin`、`Vault`、`PlaceholderAPI`、`ProtocolLib`。
@@ -68,15 +73,16 @@
 - Sprint 2 已证明 `cell-20` 可跑具体业务 Forge 1.12.2 模组 jar 的 `startup` 与 `smoke`；尚未做 `cell-20/21/22` 全矩阵。
 - Lmshop 真实 Germ 商城页已复测：页面可打开，`germ_gui_part_dos` 可按 YAML `partId` 解析并执行 `clickDos`；真实物理坐标点击仍未通过。
 - Sprint 3 已补齐 `1.20.1` / `1.12.2` 的真实 `/status` + GUI/input runtime smoke，当前可声明 priority-version runtime PASS。
-- `1.21.11` / `1.21.1` 输入 action 同步已从 Sprint 3 延后到后续 sprint。
+- Sprint 4 已完成 build/static QA；`1.21.11` / `1.21.1` runtime smoke 因无真实同版本 `/status` endpoint，仍为 `BLOCKED` / 未验证。
+- untracked `java_pid53476.hprof` 已在 Sprint 4 分支清理阶段确认路径后删除；它来自一次 OOM build 尝试，不属于交付内容。
 
 ## 下一步
 
-1. Sprint 3 已完成并保持 `done`：`docs/workflow/qa/sprint-003-qa.md` 首行为 `### PASS: bbp-sprint-003-priority-input-support`。
-2. 下一轮若继续输入 action 覆盖，单独开新 sprint 做 `1.21.11` / `1.21.1`，不要把本轮 `1.20.1` / `1.12.2` runtime PASS 外推到 `1.21.x`。
-3. 后续如果继续使用 DeepSeek worker，只让它执行测试和写 report；Sprint 2 两次 worker 均因预算耗尽未写出合格 report，最终裁决仍由 Codex/Evaluator 给出。
-4. 如果 Lmshop Sprint 2 接受“Germ YAML clickDos 语义执行”作为自动化验收证据，使用 `germ_gui_part_dos execute=true mode=player_command`；如果仍要求“真实物理点击”，继续增强客户端侧 `click_germ_component` / 鼠标注入。
-5. 多 bot 编排仍是独立后续计划，不能表述成已实现能力。
+1. 起草 Sprint 5 contract：`cell-20/21/22` Forge 1.12.2 业务模组矩阵验证；验收要包含 startup/smoke、截图或 `/status` 证据、stop/release 和端口/进程 cleanup。
+2. 整理/提交当前 Sprint 4 分支，然后按需要合并回 `main`。
+3. 如需声明 `1.21.x` runtime PASS，先准备真实 `1.21.11` / `1.21.1` Fabric 或 NeoForge endpoint，再跑同版本 `/status` + GUI/input smoke。
+4. Sprint 6 单独处理 Germ 真实物理点击；不要把 `germ_gui_part_dos` 当物理点击证明。
+5. Sprint 7 单独处理多 bot scenario orchestrator；当前仍是一客户端进程对应一个玩家身份。
 
 ## 验证记录
 
@@ -90,6 +96,10 @@
 - 2026-05-04 Sprint 3 runtime QA 通过：`cell-01` Forge 1.12.2 `/status` 为 `actions=114 ready=true`，relay `query_player_state` 成功，`GuiInventory` 上 `query_cursor_state/move_mouse/click_screen_at/key_press` 成功，`GuiChat` 上 `type_text` 16 字符和 Enter 成功，随后 stop/release 并确认 `25570/38080/38081` 无监听、无残留进程。
 - 2026-05-04 Sprint 3 runtime QA 通过：`cell-06` Forge 1.20.1 同步新 jar 后 `/status` 为 `actions=122 ready=true`，relay `query_player_state` 成功，`InventoryScreen` 上 `query_cursor_state/move_mouse/click_screen_at/key_press` 成功，`ChatScreen` 上 `type_text` 16 字符和 Enter 成功，随后 stop/release 并确认 `25615/38130/38131` 无监听、无残留进程。
 - 2026-05-04 1.20.1 runtime QA 过程中修复两点：`ScreenMouseHelper` 改为直接读取 Mojang `Window` API，避免 `Failed to resolve window metrics`；`forge1201_build` 追加 `finalizedBy(collectJars)`，避免 test-cell 同步到旧 root `build/libs` jar。
+- 2026-05-04 Sprint 4 contract 已起草并审核通过：`docs/workflow/tasks/sprint-004.md`、`docs/workflow/reviews/sprint-004-contract-review.md`；当前 `docs/workflow/status.md` phase 为 `contract-approved`；目标是 `1.21.11` / `1.21.1` Fabric + NeoForge 同步六个输入 action，下一步可进入 implementation 或调用 bounded worker。
+- 2026-05-04 Sprint 4 build/static QA 通过：新增 `1.21.11` / `1.21.1` Fabric + NeoForge 六个输入 action/helper 与 registry 注册；`.\gradlew.bat -p common test --no-daemon` 通过；`JAVA_TOOL_OPTIONS=-Xmx8g` 下 `.\gradlew.bat common_build plugin_build mod2111_build mod1211_build --no-daemon` 通过；denied-path diff 对 `mod/1.20.1`、`mod/1.12.2`、`ActionCatalog`、plugin source 和 test-cell scripts 无输出；`git diff --check` 仅有 Windows LF-to-CRLF warning。
+- 2026-05-04 Sprint 4 runtime 未验证：没有真实 `1.21.11` / `1.21.1` `/status` endpoint，因此不能声明现代端 runtime PASS；已写入 `docs/workflow/qa/sprint-004-qa.md`。
+- 2026-05-04 Sprint 4 分支清理：确认 `java_pid53476.hprof` 是仓库根下单文件后已删除；该文件未纳入提交。
 - 2026-04-24 到 2026-04-29 已多次执行 `common test`、`forge1122_build`、`plugin build`、test-cell startup、BC smoke、Germ hit-test 和 smoke 回归；详细历史见 `knowledge/tasks/timeline.md`。
 - 2026-05-01 已执行 `common_build plugin_build`，并在 `cell-01` 通过 relay、Germ 页面打开、`germ_gui_part_dos` dry-run、`player_command` 成功购买和 dry-run 无副作用验证。
 - 本轮分支整理前已执行 `git diff --check`，仅有 Windows line-ending 提示，无 whitespace error。
