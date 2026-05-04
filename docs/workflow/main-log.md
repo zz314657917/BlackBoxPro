@@ -24,3 +24,9 @@
 260504 1805 | bbp-sprint-004-modern-input-sync | local heap dump cleanup | Evaluator | java_pid53476.hprof removed
 260504 1810 | bbp-sprint-005-mod1122-matrix-evidence | contract drafted | Planner | docs/workflow/tasks/sprint-005.md
 260504 1810 | bbp-sprint-005-mod1122-matrix-evidence | contract approved | Evaluator | docs/workflow/reviews/sprint-005-contract-review.md
+260504 2025 | bbp-sprint-005-mod1122-matrix-evidence | cell-20 smoke pass | Evaluator | docs/workflow/qa/sprint-005-qa.md
+260504 2030 | bbp-sprint-005-mod1122-matrix-evidence | qa fail on cell-21 startup; cleanup clean | Evaluator | docs/workflow/qa/sprint-005-qa.md
+260504 2108 | bbp-sprint-005-mod1122-matrix-evidence | cell-21 baseline reprovisioned from cell-20 | Evaluator | scripts/test-cells/Provision-TestCellMod1122.ps1
+260504 2118 | bbp-sprint-005-mod1122-matrix-evidence | cell-21 startup pass after repair | Evaluator | docs/workflow/qa/sprint-005-qa.md
+260504 2120 | bbp-sprint-005-mod1122-matrix-evidence | stale smoke lease released before rerun | Evaluator | scripts/test-cells/Release-TestCell.ps1
+260504 2126 | bbp-sprint-005-mod1122-matrix-evidence | cell-21 smoke pass and cell-22 matrix pass; sprint done | Evaluator | docs/workflow/qa/sprint-005-qa.md
