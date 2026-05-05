@@ -14,13 +14,20 @@ allowed-tools: [Terminal, Bash, Read]
 - 服务端目录: `E:\paper-1.12.2`
 - JAR: `paper.jar`
 - JVM: `-Xms2G -Xmx4G -XX:+UseG1GC`
-- RCON: `127.0.0.1:25575` / `123456`
+- RCON: `127.0.0.1:25575`，密码从本地环境变量 `BBP_RCON_PASSWORD` 读取
 
 ## PowerShell RCON
 
 ```powershell
 function Invoke-BlackBoxRcon {
-    param([string]$Command)
+    param(
+        [string]$Command,
+        [string]$Password = $env:BBP_RCON_PASSWORD
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Password)) {
+        throw 'Missing BBP_RCON_PASSWORD environment variable.'
+    }
 
     $client = [System.Net.Sockets.TcpClient]::new('127.0.0.1', 25575)
     $stream = $client.GetStream()
@@ -47,7 +54,7 @@ function Invoke-BlackBoxRcon {
         [System.Text.Encoding]::UTF8.GetString($bodyBytes).TrimEnd([char]0)
     }
 
-    Send-RconPacket 0 3 '123456'
+    Send-RconPacket 0 3 $Password
     [void](Read-RconPacket)
     Send-RconPacket 1 2 $Command
     $result = Read-RconPacket
