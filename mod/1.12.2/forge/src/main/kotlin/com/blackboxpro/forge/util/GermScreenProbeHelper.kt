@@ -72,6 +72,14 @@ object GermScreenProbeHelper {
         "invalid" to listOf("invalid")
     )
     private val clickMethodSignals = listOf("click", "mouse", "press", "release", "dos", "action", "handle", "interact")
+    private val knownMouseHandlerNames = setOf(
+        "mouseClicked",
+        "func_73864_a",
+        "mouseReleased",
+        "func_146286_b",
+        "handleMouseInput",
+        "func_146274_d"
+    )
 
     data class ProbeOptions(
         val maxDepth: Int = DEFAULT_MAX_DEPTH,
@@ -90,7 +98,9 @@ object GermScreenProbeHelper {
         val componentId: String? = null,
         val button: Int = 0,
         val clickCount: Int = 1,
-        val fallbackScreenClick: Boolean = false
+        val fallbackScreenClick: Boolean = false,
+        val syntheticEventMethod: String? = null,
+        val syntheticScreenMethod: String? = null
     )
 
     private data class ComponentSnapshot(
@@ -110,12 +120,15 @@ object GermScreenProbeHelper {
         val invalid: Boolean?,
         val containsMouse: Boolean?,
         val containsHit: Boolean?,
+        val classSource: String?,
         val boundsSource: String?,
         val hitSource: String?,
         val hitPredicateMethod: String?,
         val fieldHints: JsonObject?,
         val numericHints: JsonArray?,
         val boundsCandidates: List<BoundsCandidate>,
+        val methodHints: List<String>?,
+        val parameterTypeHints: JsonArray?,
         val candidateMouseMethods: List<String>?
     ) {
         val hasBounds: Boolean = x != null && y != null && width != null && height != null
@@ -144,6 +157,7 @@ object GermScreenProbeHelper {
             if (invalid != null) addProperty("invalid", invalid)
             if (containsMouse != null) addProperty("containsMouse", containsMouse)
             if (containsHit != null) addProperty("containsHit", containsHit)
+            if (classSource != null) addProperty("classSource", classSource)
             if (boundsSource != null) addProperty("boundsSource", boundsSource)
             if (hitSource != null) addProperty("hitSource", hitSource)
             if (hitPredicateMethod != null) addProperty("hitPredicateMethod", hitPredicateMethod)
@@ -154,6 +168,12 @@ object GermScreenProbeHelper {
                     boundsCandidates.forEach { add(it.toJson(hitX = null, hitY = null)) }
                 })
             }
+            if (!methodHints.isNullOrEmpty()) {
+                add("methodHints", JsonArray().apply {
+                    methodHints.forEach { add(it) }
+                })
+            }
+            if (parameterTypeHints != null) add("parameterTypeHints", parameterTypeHints)
             if (!candidateMouseMethods.isNullOrEmpty()) {
                 add("candidateMouseMethods", JsonArray().apply {
                     candidateMouseMethods.forEach { add(it) }
@@ -195,7 +215,35 @@ object GermScreenProbeHelper {
 
     private data class ComponentTarget(val snapshot: ComponentSnapshot, val value: Any)
 
-    private data class InvokeResult(val signature: String, val result: Any?)
+    private data class ClickAttempt(
+        val path: String,
+        val signature: String,
+        val ok: Boolean,
+        val handled: Boolean? = null,
+        val result: Any? = null,
+        val error: String? = null
+    ) {
+        fun toJson(): JsonObject = JsonObject().apply {
+            addProperty("path", path)
+            addProperty("signature", signature)
+            addProperty("ok", ok)
+            if (handled != null) addProperty("handled", handled)
+            if (result != null) addProperty("result", safeString(result))
+            if (error != null) addProperty("error", error)
+        }
+    }
+
+    private data class ComponentClickReport(val attempts: List<ClickAttempt>) {
+        val success: Boolean = attempts.any { it.ok }
+
+        fun toJson(repeatIndex: Int): JsonObject = JsonObject().apply {
+            addProperty("repeatIndex", repeatIndex)
+            addProperty("ok", success)
+            add("attempts", JsonArray().apply {
+                attempts.forEach { add(it.toJson()) }
+            })
+        }
+    }
 
     fun query(options: ProbeOptions): JsonObject {
         val mc = Minecraft.getMinecraft()
@@ -329,18 +377,133 @@ object GermScreenProbeHelper {
         val target = selectClickTarget(targets, options.componentId)
             ?: throw IllegalStateException("No Germ component matched click target")
         val repeats = options.clickCount.coerceAtLeast(1)
-        val invoked = mutableListOf<InvokeResult>()
+        val componentReports = mutableListOf<ComponentClickReport>()
+        val selectedBounds = target.snapshot.boundsCandidates.firstOrNull { it.contains(hitX, hitY) }
+            ?: target.snapshot.boundsCandidates.firstOrNull()
+            ?: target.snapshot.x?.let { x ->
+                val y = target.snapshot.y ?: hitY
+                val width = target.snapshot.width ?: 0.0
+                val height = target.snapshot.height ?: 0.0
+                BoundsCandidate("snapshot", x, y, width, height)
+            }
+        val relativeHitX = if (selectedBounds != null) hitX - selectedBounds.x else hitX
+        val relativeHitY = if (selectedBounds != null) hitY - selectedBounds.y else hitY
 
         ScreenMouseHelper.moveMouse(hitX, hitY)
         repeat(repeats) {
-            invoked.add(invokeBestMouseMethod(target.value, hitX, hitY, options.button))
-        }
-        if (options.fallbackScreenClick) {
-            runCatching {
-                ScreenMouseHelper.clickMouse(options.button, 1)
-            }.onFailure {
-                addWarning(warnings, "fallback-screen-click-failed:${it.javaClass.simpleName}:${it.message}")
+            val report = invokeCandidateMouseMethods(
+                value = target.value,
+                hitX = hitX,
+                hitY = hitY,
+                button = options.button,
+                syntheticEventMethod = options.syntheticEventMethod
+            )
+            componentReports.add(report)
+            if (!report.success) {
+                addWarning(warnings, "component-click-failed:repeat=$it")
             }
+        }
+        val componentSucceeded = componentReports.any { it.success }
+        var screenSyntheticSucceeded = false
+        var screenSyntheticJson = JsonObject().apply {
+            addProperty("requested", !options.syntheticScreenMethod.isNullOrBlank())
+            addProperty("ok", false)
+        }
+        if (!options.syntheticScreenMethod.isNullOrBlank()) {
+            screenSyntheticJson = invokeSyntheticScreenMethod(screen, options.syntheticScreenMethod, hitX, hitY, options.button)
+            screenSyntheticSucceeded = screenSyntheticJson.get("ok")?.asBoolean == true
+            if (!screenSyntheticSucceeded) {
+                addWarning(warnings, "screen-synthetic-click-failed:${options.syntheticScreenMethod}")
+            }
+        }
+        var fallbackSucceeded = false
+        var fallbackPath = "none"
+        var fallbackJson = JsonObject().apply {
+            addProperty("requested", options.fallbackScreenClick)
+            addProperty("ok", false)
+        }
+        if (options.fallbackScreenClick && !componentSucceeded && !screenSyntheticSucceeded) {
+            val nativeFallback = runCatching {
+                ScreenMouseHelper.clickNativeMouseAtWithEvidence(
+                    guiX = hitX,
+                    guiY = hitY,
+                    button = options.button,
+                    clickCount = repeats,
+                    throwOnFailure = false
+                )
+            }
+            var nativeOk = false
+            val nativeJson = nativeFallback.fold(
+                onSuccess = {
+                    nativeOk = it.ok
+                    if (!it.ok) {
+                        addWarning(warnings, "native-screen-click-failed")
+                    }
+                    it.toJson()
+                },
+                onFailure = {
+                    addWarning(warnings, "native-screen-click-failed:${it.javaClass.simpleName}:${it.message}")
+                    JsonObject().apply {
+                        addProperty("requested", true)
+                        addProperty("ok", false)
+                        addProperty("error", "${it.javaClass.simpleName}:${it.message}")
+                    }
+                }
+            )
+            var reflectiveOk = false
+            val reflectiveJson = if (nativeOk) {
+                JsonObject().apply {
+                    addProperty("requested", false)
+                    addProperty("ok", false)
+                    addProperty("skipped", true)
+                    addProperty("reason", "native-screen-click-succeeded")
+                }
+            } else {
+                val fallback = runCatching {
+                    ScreenMouseHelper.clickMouseWithEvidence(options.button, repeats, throwOnFailure = false)
+                }
+                fallback.fold(
+                    onSuccess = {
+                        reflectiveOk = it.ok
+                        if (!it.ok) {
+                            addWarning(warnings, "reflective-screen-click-failed")
+                        }
+                        it.toJson()
+                    },
+                    onFailure = {
+                        addWarning(warnings, "reflective-screen-click-failed:${it.javaClass.simpleName}:${it.message}")
+                        JsonObject().apply {
+                            addProperty("requested", true)
+                            addProperty("ok", false)
+                            addProperty("error", "${it.javaClass.simpleName}:${it.message}")
+                        }
+                    }
+                )
+            }
+            fallbackSucceeded = nativeOk || reflectiveOk
+            fallbackPath = when {
+                nativeOk -> "native-screen"
+                reflectiveOk -> "screen"
+                else -> "none"
+            }
+            fallbackJson = JsonObject().apply {
+                addProperty("requested", true)
+                addProperty("ok", fallbackSucceeded)
+                addProperty("path", fallbackPath)
+                add("nativeMouseClick", nativeJson)
+                add("reflectiveScreenClick", reflectiveJson)
+            }
+        } else if (options.fallbackScreenClick) {
+            fallbackJson = JsonObject().apply {
+                addProperty("requested", true)
+                addProperty("ok", false)
+                addProperty("skipped", true)
+                addProperty("reason", "component-succeeded")
+            }
+        }
+        val clickSucceeded = componentSucceeded || screenSyntheticSucceeded || fallbackSucceeded
+        if (!clickSucceeded) {
+            throw IllegalStateException("No Germ click path succeeded for target ${target.snapshot.id}")
         }
 
         val warningArray = JsonArray()
@@ -355,15 +518,45 @@ object GermScreenProbeHelper {
             addProperty("button", options.button)
             addProperty("clickCount", repeats)
             addProperty("componentCount", components.size)
-            add("target", target.snapshot.toJson(1))
-            add("invoked", JsonArray().apply {
-                invoked.forEach {
-                    add(JsonObject().apply {
-                        addProperty("signature", it.signature)
-                        if (it.result != null) addProperty("result", safeString(it.result))
-                    })
+            addProperty("clickSucceeded", clickSucceeded)
+            addProperty(
+                "clickPath",
+                when {
+                    componentSucceeded && screenSyntheticSucceeded && fallbackSucceeded -> "component+screen-synthetic+$fallbackPath"
+                    componentSucceeded && screenSyntheticSucceeded -> "component+screen-synthetic"
+                    screenSyntheticSucceeded && fallbackSucceeded -> "screen-synthetic+$fallbackPath"
+                    componentSucceeded && fallbackSucceeded -> "component+$fallbackPath"
+                    componentSucceeded -> "component"
+                    screenSyntheticSucceeded -> "screen-synthetic"
+                    fallbackSucceeded -> fallbackPath
+                    else -> "none"
                 }
+            )
+            add("selectedCoordinate", JsonObject().apply {
+                addProperty("x", hitX)
+                addProperty("y", hitY)
             })
+            add("target", target.snapshot.toJson(1))
+            add("componentClick", JsonObject().apply {
+                addProperty("ok", componentSucceeded)
+                add("coordinate", JsonObject().apply {
+                    addProperty("x", hitX)
+                    addProperty("y", hitY)
+                    addProperty("space", "screen")
+                    add("relative", JsonObject().apply {
+                        addProperty("x", relativeHitX)
+                        addProperty("y", relativeHitY)
+                    })
+                    if (selectedBounds != null) {
+                        add("bounds", selectedBounds.toJson(hitX, hitY))
+                    }
+                })
+                add("repeats", JsonArray().apply {
+                    componentReports.forEachIndexed { index, report -> add(report.toJson(index)) }
+                })
+            })
+            add("screenSyntheticClick", screenSyntheticJson)
+            add("fallbackScreenClick", fallbackJson)
             add("probeWarnings", warningArray)
         }
     }
@@ -560,12 +753,15 @@ object GermScreenProbeHelper {
             invalid = invalid,
             containsMouse = containsMouse,
             containsHit = containsHit,
+            classSource = if (includeFields) buildClassSource(value) else null,
             boundsSource = primaryBounds?.source,
             hitSource = hitSource,
             hitPredicateMethod = predicateHit?.method,
             fieldHints = if (includeFields) buildFieldHints(value, warnings) else null,
             numericHints = if (includeFields) buildNumericHints(value) else null,
             boundsCandidates = exposedBoundsCandidates,
+            methodHints = if (includeFields) buildMethodHints(value) else null,
+            parameterTypeHints = if (includeFields) buildParameterTypeHints(value) else null,
             candidateMouseMethods = if (includeFields) buildCandidateMouseMethods(value) else null
         )
     }
@@ -949,6 +1145,54 @@ object GermScreenProbeHelper {
         return methods.toList()
     }
 
+    private fun buildMethodHints(value: Any): List<String> {
+        val methods = linkedSetOf<String>()
+        for (method in declaredMethods(value.javaClass)) {
+            if (methods.size >= MAX_METHOD_HINTS * 3) break
+            if (Modifier.isStatic(method.modifiers)) continue
+            methods.add(methodSignature(method))
+        }
+        return methods.toList()
+    }
+
+    private fun buildParameterTypeHints(value: Any): JsonArray {
+        val seen = linkedSetOf<Class<*>>()
+        for (method in declaredMethods(value.javaClass)) {
+            if (seen.size >= MAX_METHOD_HINTS) break
+            if (Modifier.isStatic(method.modifiers)) continue
+            for (type in method.parameterTypes) {
+                if (seen.size >= MAX_METHOD_HINTS) break
+                if (isSafeMouseMethodParam(type) || type.name.startsWith("java.") || type.name.startsWith("net.minecraft.")) {
+                    continue
+                }
+                seen.add(type)
+            }
+        }
+        return JsonArray().apply {
+            seen.forEach { type ->
+                add(JsonObject().apply {
+                    addProperty("className", type.name)
+                    add("constructors", JsonArray().apply {
+                        type.declaredConstructors.take(12).forEach { constructor ->
+                            add("${type.simpleName.ifEmpty { type.name }}(${constructor.parameterTypes.joinToString(",") { param -> param.simpleName.ifEmpty { param.name } }})")
+                        }
+                    })
+                    add("fields", JsonArray().apply {
+                        declaredFields(type).asSequence()
+                            .filter { !Modifier.isStatic(it.modifiers) }
+                            .take(20)
+                            .forEach { field -> add("${field.name}:${field.type.simpleName.ifEmpty { field.type.name }}") }
+                    })
+                })
+            }
+        }
+    }
+
+    private fun buildClassSource(value: Any): String? =
+        runCatching {
+            value.javaClass.protectionDomain?.codeSource?.location?.toString()
+        }.getOrNull()
+
     private fun selectClickTarget(targets: List<ComponentTarget>, componentId: String?): ComponentTarget? {
         if (!componentId.isNullOrBlank()) {
             return targets.firstOrNull { it.snapshot.id == componentId }
@@ -961,57 +1205,439 @@ object GermScreenProbeHelper {
             .firstOrNull()
     }
 
-    private fun invokeBestMouseMethod(value: Any, hitX: Double, hitY: Double, button: Int): InvokeResult {
+    private fun invokeCandidateMouseMethods(
+        value: Any,
+        hitX: Double,
+        hitY: Double,
+        button: Int,
+        syntheticEventMethod: String?
+    ): ComponentClickReport {
         val candidates = declaredMethods(value.javaClass)
             .asSequence()
             .filter { !Modifier.isStatic(it.modifiers) }
-            .filter { looksLikeInvokableMouseMethod(it) }
+            .filter { looksLikeMouseMethod(it) }
             .sortedWith(compareByDescending<Method> { mouseMethodPriority(it) }.thenBy { it.parameterTypes.size })
             .toList()
-        val failures = mutableListOf<String>()
-        for (method in candidates) {
-            val args = buildMouseArgs(method.parameterTypes, hitX, hitY, button) ?: continue
-            val signature = methodSignature(method)
-            try {
-                method.isAccessible = true
-                val result = method.invoke(value, *args)
-                return InvokeResult(signature, result)
-            } catch (it: Throwable) {
-                val target = if (it is java.lang.reflect.InvocationTargetException) it.targetException ?: it else it
-                failures.add("$signature:${target.javaClass.simpleName}:${target.message}")
-            }
+        val attempts = mutableListOf<ClickAttempt>()
+        val namedCandidates = candidates.filter { isClickLikeMouseMethod(it) || knownMouseHandlerNames.contains(it.name) }
+        val shapeOnlyCandidates = candidates - namedCandidates.toSet()
+        if (invokeMouseCandidateGroup(value, "component-named", namedCandidates, hitX, hitY, button, attempts)) {
+            return ComponentClickReport(attempts)
         }
-        throw IllegalStateException(
-            if (failures.isEmpty()) {
-                "No invokable Germ mouse method on ${value.javaClass.name}"
-            } else {
-                "No Germ mouse method invocation succeeded: ${failures.joinToString("; ")}"
+        if (!syntheticEventMethod.isNullOrBlank() &&
+            invokeSyntheticEventCandidate(value, syntheticEventMethod, hitX, hitY, button, attempts)
+        ) {
+            return ComponentClickReport(attempts)
+        }
+        if (invokeMouseCandidateGroup(
+                value = value,
+                path = "component-shape",
+                candidates = shapeOnlyCandidates.take(MAX_METHOD_HINTS),
+                hitX = hitX,
+                hitY = hitY,
+                button = button,
+                attempts = attempts
+            )
+        ) {
+            return ComponentClickReport(attempts)
+        }
+        return ComponentClickReport(
+            attempts.ifEmpty {
+                listOf(
+                    ClickAttempt(
+                        path = "component",
+                        signature = value.javaClass.name,
+                        ok = false,
+                        error = "no-invokable-germ-mouse-method"
+                    )
+                )
             }
         )
     }
 
-    private fun looksLikeInvokableMouseMethod(method: Method): Boolean {
-        val params = method.parameterTypes
-        if (params.size !in 2..4) return false
-        if (!params.all(::isSafeMouseMethodParam)) return false
-        if (method.returnType == java.lang.Boolean.TYPE || method.returnType == java.lang.Boolean::class.java) return false
-        val numericCount = params.count { isNumericPrimitive(it) || Number::class.java.isAssignableFrom(it) }
-        if (numericCount < 2) return false
-        val name = method.name.lowercase()
-        return clickMethodSignals.any { name.contains(it) } || numericCount == params.size
+    private fun invokeMouseCandidateGroup(
+        value: Any,
+        path: String,
+        candidates: List<Method>,
+        hitX: Double,
+        hitY: Double,
+        button: Int,
+        attempts: MutableList<ClickAttempt>
+    ): Boolean {
+        for (method in candidates) {
+            val signature = methodSignature(method)
+            val args = buildMouseArgs(method.parameterTypes, hitX, hitY, button)
+            if (args == null) {
+                attempts.add(
+                    ClickAttempt(
+                        path = path,
+                        signature = signature,
+                        ok = false,
+                        error = "unsupported-parameter-shape"
+                    )
+                )
+                continue
+            }
+            try {
+                method.isAccessible = true
+                val result = method.invoke(value, *args)
+                attempts.add(
+                    ClickAttempt(
+                        path = path,
+                        signature = signature,
+                        ok = true,
+                        handled = result as? Boolean,
+                        result = result,
+                    )
+                )
+                if (result !is Boolean || result) {
+                    return true
+                }
+            } catch (it: Throwable) {
+                val target = if (it is java.lang.reflect.InvocationTargetException) it.targetException ?: it else it
+                attempts.add(
+                    ClickAttempt(
+                        path = path,
+                        signature = signature,
+                        ok = false,
+                        error = "${target.javaClass.simpleName}:${target.message}"
+                    )
+                )
+            }
+        }
+        return false
+    }
+
+    private fun invokeSyntheticEventCandidate(
+        value: Any,
+        methodSelector: String,
+        hitX: Double,
+        hitY: Double,
+        button: Int,
+        attempts: MutableList<ClickAttempt>
+    ): Boolean {
+        val candidates = declaredMethods(value.javaClass)
+            .asSequence()
+            .filter { !Modifier.isStatic(it.modifiers) }
+            .filter { method ->
+                method.parameterTypes.size == 1 &&
+                    hasGermSignal(method.parameterTypes[0].name) &&
+                    (method.name == methodSelector || methodSignature(method).startsWith(methodSelector))
+            }
+            .toList()
+        if (candidates.isEmpty()) {
+            attempts.add(
+                ClickAttempt(
+                    path = "component-synthetic-event",
+                    signature = methodSelector,
+                    ok = false,
+                    error = "no-matching-synthetic-event-method"
+                )
+            )
+            return false
+        }
+
+        for (method in candidates) {
+            val signature = methodSignature(method)
+            val eventType = method.parameterTypes[0]
+            val pressed = createSyntheticMouseEvent(eventType, hitX, hitY, button, true)
+            val released = createSyntheticMouseEvent(eventType, hitX, hitY, button, false)
+            if (pressed == null || released == null) {
+                attempts.add(
+                    ClickAttempt(
+                        path = "component-synthetic-event",
+                        signature = signature,
+                        ok = false,
+                        error = "unable-to-create-synthetic-event:${eventType.name}"
+                    )
+                )
+                continue
+            }
+            val pressOk = invokeSyntheticEventMethod(value, method, pressed, "press", attempts)
+            val releaseOk = invokeSyntheticEventMethod(value, method, released, "release", attempts)
+            if (pressOk && releaseOk) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun invokeSyntheticEventMethod(
+        value: Any,
+        method: Method,
+        event: Any,
+        phase: String,
+        attempts: MutableList<ClickAttempt>,
+        path: String = "component-synthetic-event"
+    ): Boolean {
+        val signature = "${methodSignature(method)}#$phase"
+        return try {
+            method.isAccessible = true
+            val result = method.invoke(value, event)
+            attempts.add(
+                ClickAttempt(
+                    path = path,
+                    signature = signature,
+                    ok = true,
+                    handled = result as? Boolean,
+                    result = result ?: "invoked"
+                )
+            )
+            true
+        } catch (it: Throwable) {
+            val target = if (it is java.lang.reflect.InvocationTargetException) it.targetException ?: it else it
+            attempts.add(
+                ClickAttempt(
+                    path = path,
+                    signature = signature,
+                    ok = false,
+                    error = "${target.javaClass.simpleName}:${target.message}"
+                )
+            )
+            false
+        }
+    }
+
+    private fun createSyntheticMouseEvent(type: Class<*>, hitX: Double, hitY: Double, button: Int, pressed: Boolean): Any? =
+        runCatching {
+            val constructor = type.getDeclaredConstructor()
+            constructor.isAccessible = true
+            val event = constructor.newInstance()
+            val floatValues = listOf(hitX.toFloat(), hitY.toFloat(), hitX.toFloat(), hitY.toFloat())
+            var floatIndex = 0
+            for (field in declaredFields(type)) {
+                if (Modifier.isStatic(field.modifiers)) continue
+                field.isAccessible = true
+                when (field.type) {
+                    java.lang.Float.TYPE, java.lang.Float::class.java -> {
+                        field.set(event, floatValues[floatIndex.coerceAtMost(floatValues.lastIndex)])
+                        floatIndex++
+                    }
+                    java.lang.Integer.TYPE, java.lang.Integer::class.java -> field.set(event, button)
+                    java.lang.Long.TYPE, java.lang.Long::class.java -> field.set(event, System.currentTimeMillis())
+                    java.lang.Boolean.TYPE, java.lang.Boolean::class.java -> field.set(event, pressed)
+                }
+            }
+            event
+        }.getOrNull()
+
+    private fun invokeSyntheticScreenMethod(
+        screen: Any,
+        methodSelector: String,
+        hitX: Double,
+        hitY: Double,
+        button: Int
+    ): JsonObject {
+        val attempts = mutableListOf<ClickAttempt>()
+        val selectorName = methodSelector.substringBefore("(").trim()
+        val preferZeroArg = methodSelector.contains("()")
+        val candidates = declaredMethods(screen.javaClass)
+            .asSequence()
+            .filter { !Modifier.isStatic(it.modifiers) }
+            .filter { method ->
+                val signature = methodSignature(method)
+                val nameMatches = method.name == methodSelector || method.name == selectorName
+                val signatureMatches = signature.startsWith(methodSelector) || signature.startsWith(selectorName)
+                val arityMatches = method.parameterTypes.size in 0..1
+                val paramMatches = method.parameterTypes.size == 0 || hasGermSignal(method.parameterTypes[0].name)
+                arityMatches && paramMatches && (nameMatches || signatureMatches)
+            }
+            .toList()
+        if (candidates.isEmpty()) {
+            attempts.add(
+                ClickAttempt(
+                    path = "screen-synthetic-event",
+                    signature = methodSelector,
+                    ok = false,
+                    error = "no-matching-screen-synthetic-event-method"
+                )
+            )
+            return JsonObject().apply {
+                addProperty("requested", true)
+                addProperty("ok", false)
+                addProperty("method", methodSelector)
+                add("attempts", JsonArray().apply {
+                    attempts.forEach { add(it.toJson()) }
+                })
+            }
+        }
+
+        val factoryResults = mutableListOf<Any>()
+        val zeroArgFactories = candidates.filter { it.parameterTypes.isEmpty() && it.returnType != java.lang.Void.TYPE }
+        val zeroArgHandlers = candidates.filter { it.parameterTypes.isEmpty() && it.returnType == java.lang.Void.TYPE }
+        val oneArgCandidates = candidates.filter { it.parameterTypes.size == 1 }
+
+        if (preferZeroArg) {
+            for (method in zeroArgHandlers) {
+                val signature = methodSignature(method)
+                try {
+                    method.isAccessible = true
+                    val result = method.invoke(screen)
+                    attempts.add(
+                        ClickAttempt(
+                            path = "screen-synthetic-event",
+                            signature = signature,
+                            ok = true,
+                            result = result ?: "invoked"
+                        )
+                    )
+                    break
+                } catch (it: Throwable) {
+                    val target = if (it is java.lang.reflect.InvocationTargetException) it.targetException ?: it else it
+                    attempts.add(
+                        ClickAttempt(
+                            path = "screen-synthetic-event",
+                            signature = signature,
+                            ok = false,
+                            error = "${target.javaClass.simpleName}:${target.message}"
+                        )
+                    )
+                }
+            }
+            if (attempts.any { it.ok }) {
+                return JsonObject().apply {
+                    addProperty("requested", true)
+                    addProperty("ok", true)
+                    addProperty("method", methodSelector)
+                    add("attempts", JsonArray().apply {
+                        attempts.forEach { add(it.toJson()) }
+                    })
+                }
+            }
+        }
+
+        for (method in zeroArgFactories) {
+            val signature = methodSignature(method)
+            val result = runCatching {
+                method.isAccessible = true
+                method.invoke(screen)
+            }.getOrElse {
+                val target = if (it is java.lang.reflect.InvocationTargetException) it.targetException ?: it else it
+                attempts.add(
+                    ClickAttempt(
+                        path = "screen-synthetic-event",
+                        signature = signature,
+                        ok = false,
+                        error = "${target.javaClass.simpleName}:${target.message}"
+                    )
+                )
+                null
+            }
+            if (result != null) {
+                factoryResults.add(result)
+                attempts.add(
+                    ClickAttempt(
+                        path = "screen-synthetic-event",
+                        signature = signature,
+                        ok = false,
+                        result = safeString(result),
+                        error = "factory-returned"
+                    )
+                )
+            }
+        }
+
+        for (factory in factoryResults) {
+            for (method in oneArgCandidates) {
+                val paramType = method.parameterTypes[0]
+                if (!paramType.isAssignableFrom(factory.javaClass) &&
+                    paramType.name != factory.javaClass.name
+                ) {
+                    continue
+                }
+                if (invokeSyntheticEventMethod(screen, method, factory, "factory", attempts, "screen-synthetic-event")) {
+                    break
+                }
+            }
+            if (attempts.takeLast(1).any { it.ok }) {
+                break
+            }
+        }
+
+        if (attempts.none { it.ok }) {
+            for (method in oneArgCandidates) {
+                val eventType = method.parameterTypes[0]
+                val pressed = createSyntheticMouseEvent(eventType, hitX, hitY, button, true)
+                val released = createSyntheticMouseEvent(eventType, hitX, hitY, button, false)
+                if (pressed == null || released == null) {
+                    attempts.add(
+                        ClickAttempt(
+                            path = "screen-synthetic-event",
+                            signature = methodSignature(method),
+                            ok = false,
+                            error = "unable-to-create-synthetic-event:${eventType.name}"
+                        )
+                    )
+                    continue
+                }
+                invokeSyntheticEventMethod(screen, method, pressed, "press", attempts, "screen-synthetic-event")
+                invokeSyntheticEventMethod(screen, method, released, "release", attempts, "screen-synthetic-event")
+                if (attempts.takeLast(2).all { it.ok }) break
+            }
+        }
+
+        if (!preferZeroArg && attempts.none { it.ok }) {
+            for (method in zeroArgHandlers) {
+                val signature = methodSignature(method)
+                try {
+                    method.isAccessible = true
+                    val result = method.invoke(screen)
+                    attempts.add(
+                        ClickAttempt(
+                            path = "screen-synthetic-event",
+                            signature = signature,
+                            ok = true,
+                            result = result ?: "invoked"
+                        )
+                    )
+                    break
+                } catch (it: Throwable) {
+                    val target = if (it is java.lang.reflect.InvocationTargetException) it.targetException ?: it else it
+                    attempts.add(
+                        ClickAttempt(
+                            path = "screen-synthetic-event",
+                            signature = signature,
+                            ok = false,
+                            error = "${target.javaClass.simpleName}:${target.message}"
+                        )
+                    )
+                }
+            }
+        }
+
+        return JsonObject().apply {
+            addProperty("requested", true)
+            addProperty("ok", attempts.isNotEmpty() && attempts.any { it.ok })
+            addProperty("method", methodSelector)
+            add("attempts", JsonArray().apply {
+                attempts.forEach { add(it.toJson()) }
+            })
+        }
     }
 
     private fun mouseMethodPriority(method: Method): Int {
-        val name = method.name.lowercase()
+        val name = method.name
+        val lowerName = name.lowercase()
         val params = method.parameterTypes
-        val clickName = clickMethodSignals.any { name.contains(it) }
+        val clickName = isClickLikeMouseMethod(method)
+        val knownMouseHandler = knownMouseHandlerNames.contains(name)
         return when {
+            knownMouseHandler && params.size == 3 -> 120
+            knownMouseHandler && params.size == 2 -> 110
             clickName && params.size == 3 -> 100
             clickName && params.size == 2 -> 90
-            params.size == 3 -> 70
+            clickName && lowerName.contains("release") -> 80
             params.size == 2 -> 60
-            else -> 10
+            params.size == 3 -> 50
+            else -> 0
         }
+    }
+
+    private fun isClickLikeMouseMethod(method: Method): Boolean {
+        val name = method.name
+        if (knownMouseHandlerNames.contains(name)) return true
+        val lowerName = name.lowercase()
+        return clickMethodSignals.any { lowerName.contains(it) }
     }
 
     private fun buildMouseArgs(types: kotlin.Array<Class<*>>, hitX: Double, hitY: Double, button: Int): kotlin.Array<Any>? {
@@ -1035,6 +1661,8 @@ object GermScreenProbeHelper {
         java.lang.Long.TYPE, java.lang.Long::class.java -> value.toLong()
         java.lang.Short.TYPE, java.lang.Short::class.java -> value.toInt().toShort()
         java.lang.Byte.TYPE, java.lang.Byte::class.java -> value.toInt().toByte()
+        java.lang.Boolean.TYPE, java.lang.Boolean::class.java -> value != 0.0
+        String::class.java -> value.toString()
         else -> null
     }
 

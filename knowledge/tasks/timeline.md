@@ -1,5 +1,28 @@
 # BlackBoxPro 时间轴
 
+## 2026-05-05 16:40 +08:00 - Sprint 6 component hook retest still failed
+
+- Sprint 6 remains `fix`, not `done`.
+- `component-shape` obfuscated numeric candidates are now invoked instead of being skipped.
+- `click_germ_component` can invoke `ALLATORIxDEMO(float,float):void` with `clickPath=component` and `componentClick.ok=true`.
+- Real Germ page remained available via `/gp open zzzderk 分类商城正式模板`.
+- Runtime business evidence still failed: PlayerPoints for `zzzderk` stayed `7988 -> 7988`.
+- Parent target `root.ALLATORIxDEMO.else[0].class[58]` at `x=137.84,y=108.13` also stayed `7988 -> 7988`.
+- Static/build gates passed: `common test`, `common_build plugin_build forge1122_build`, denied-path diff, and `git diff --check`.
+- Cleanup was clean: `cell-01` stop/release succeeded; `25570/38080/38081` and matching `cmd/java/javaw` checks were empty.
+- Next legal action: find a real Germ screen/event queue hook, or rewrite Sprint 6 around a fixed Germ test page with an observable side effect.
+
+## 2026-05-05 00:48 +08:00 - Sprint 6 runtime QA failed
+
+- Sprint 6 implementation/build gates passed, but runtime acceptance failed.
+- `click_germ_component` now returns structured evidence and no longer treats generic obfuscated numeric methods like `ALLATORIxDEMO(float,float):void` as a successful component click.
+- Real Germ page was available via `/gp open zzzderk 分类商城正式模板`; `query_germ_hit_test` at `x=138,y=84` hit the target region.
+- `germ_gui_part_dos execute=false` resolved the `商品2点券` buy command, confirming the semantic business path exists; it was not executed and not used as PASS evidence.
+- Final `click_germ_component` result used `clickPath=screen`, `componentClick.ok=false`, `fallbackScreenClick.ok=true`.
+- Business side effect failed: PlayerPoints for `zzzderk` stayed `7988 -> 7988`.
+- Cleanup was clean: `cell-01` stop/release succeeded; `25570/38080/38081` and matching `cmd/java/javaw` checks were empty.
+- Current phase is `fix`; next work is to find a real Germ client click hook or rewrite the contract if no stable hook exists.
+
 ## 2026-05-04 23:10 +08:00 - Sprint 6 Germ real click contract approved
 
 - 当前阶段：P/G/E 已从 Sprint 5 `done` 推进到 Sprint 6 `contract-approved`。

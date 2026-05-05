@@ -20,11 +20,14 @@ class ClickGermComponentAction : ActionExecutor {
             componentId = params.getStringOrNull("componentId"),
             button = params.getIntOrDefault("button", 0),
             clickCount = params.getIntOrDefault("clickCount", 1),
-            fallbackScreenClick = params.getBooleanOrDefault("fallbackScreenClick", false)
+            fallbackScreenClick = params.getBooleanOrDefault("fallbackScreenClick", false),
+            syntheticEventMethod = params.getStringOrNull("syntheticEventMethod"),
+            syntheticScreenMethod = params.getStringOrNull("syntheticScreenMethod")
         )
         val data = GermScreenProbeHelper.click(options)
         val x = options.hitX?.toString() ?: "cursor"
         val y = options.hitY?.toString() ?: "cursor"
-        return ActionResult.ok("Clicked Germ component at ($x, $y)", data)
+        val path = data.get("clickPath")?.asString ?: "unknown"
+        return ActionResult.ok("Clicked Germ component at ($x, $y) via $path", data)
     }
 }

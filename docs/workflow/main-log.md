@@ -32,3 +32,9 @@
 260504 2126 | bbp-sprint-005-mod1122-matrix-evidence | cell-21 smoke pass and cell-22 matrix pass; sprint done | Evaluator | docs/workflow/qa/sprint-005-qa.md
 260504 2310 | bbp-sprint-006-germ-real-physical-click | contract drafted | Planner | docs/workflow/tasks/sprint-006.md
 260504 2310 | bbp-sprint-006-germ-real-physical-click | contract approved | Evaluator | docs/workflow/reviews/sprint-006-contract-review.md
+260505 0008 | bbp-sprint-006-germ-real-physical-click-qa | worker-start | codex | E:\codex-worktrees\blackboxpro-dev-2.0\bbp-sprint-006-germ-real-physical-click-qa
+260505 0010 | bbp-sprint-006-germ-real-physical-click-qa | worker-fail | worker | E:\codex-worktrees\blackboxpro-dev-2.0\bbp-sprint-006-germ-real-physical-click-qa\docs\workflow\worker-results\bbp-sprint-006-germ-real-physical-click-qa-worker.json
+260505 0048 | bbp-sprint-006-germ-real-physical-click | build pass and runtime qa fail | Evaluator | docs/workflow/qa/sprint-006-qa.md
+260505 0048 | bbp-sprint-006-germ-real-physical-click | cleanup clean and handoff updated | Evaluator | knowledge/tasks/current-task.md
+260505 1640 | bbp-sprint-006-germ-real-physical-click | component hook retest still no business effect | Evaluator | docs/workflow/qa/sprint-006-qa.md
+260505 1640 | bbp-sprint-006-germ-real-physical-click | cleanup clean and status remains fix | Evaluator | docs/workflow/status.md
