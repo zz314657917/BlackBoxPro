@@ -49,6 +49,14 @@ object BlackBoxTestCatalog {
         "hover_slot",
         "query_slot_tooltip",
         "query_tooltip_state",
+        "query_germ_screen",
+        "query_germ_hit_test",
+        "move_mouse",
+        "click_mouse",
+        "click_screen_at",
+        "click_germ_component",
+        "germ_gui_part_dos",
+        "type_text",
         "leave_bed",
         "horse_jump_start",
         "horse_jump_stop",
@@ -368,6 +376,8 @@ object BlackBoxTestCatalog {
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("该 action 用于启动前连接流程，不纳入 run_test 全量回放"))
             "close_screen" ->
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("需要显式打开 GUI；当前 run_test 默认场景不覆盖"))
+            "query_germ_screen", "query_germ_hit_test", "click_germ_component", "germ_gui_part_dos" ->
+                CompletableFuture.completedFuture(BlackBoxPrepareResult("需要先打开真实 Germ GUI；当前 run_test 默认场景只验证 action 可注册"))
             "create_world", "join_world", "leave_world" ->
                 CompletableFuture.completedFuture(BlackBoxPrepareResult("该 action 属于客户端会话管理，当前 run_test 服务端联调链路不覆盖"))
 
@@ -400,6 +410,9 @@ object BlackBoxTestCatalog {
             "query_tab_list",
             "query_scoreboard",
             "query_screen_state",
+            "query_cursor_state",
+            "query_germ_screen",
+            "query_germ_hit_test",
             "query_boss_bar" -> if (data != null && data.size() > 0) null else "查询响应没有返回数据"
             else -> null
         }
@@ -441,6 +454,11 @@ object BlackBoxTestCatalog {
         "sneak_start", "sneak_stop", "sprint_start", "sprint_stop", "jump", "swap_hands", "leave_bed", "drop_item", "drop_item_stack", "perform_respawn" -> JsonObject()
         "chat_message" -> JsonObject().apply { addProperty("message", "[BlackBoxPro] full action test") }
         "chat_command" -> JsonObject().apply { addProperty("command", "me BlackBoxPro full test") }
+        "click_chat_text" -> JsonObject().apply {
+            addProperty("match", "默认频道")
+            addProperty("index", 1)
+            addProperty("execute", false)
+        }
         "set_carried_item", "creative_set_slot" -> JsonObject().apply { addProperty("slot", 0) }
         "client_information" -> JsonObject().apply {
             addProperty("locale", "zh_cn")
@@ -458,8 +476,30 @@ object BlackBoxTestCatalog {
             addProperty("result", "accepted")
         }
         "connect_to_server" -> JsonObject().apply {
-            addProperty("ip", "127.0.0.1")
-            addProperty("port", 25565)
+            addProperty("ip", "localhost")
+            addProperty("port", 25570)
+        }
+        "move_mouse" -> JsonObject().apply {
+            addProperty("x", 320.0)
+            addProperty("y", 180.0)
+        }
+        "click_mouse" -> JsonObject().apply {
+            addProperty("button", 0)
+            addProperty("clickCount", 1)
+        }
+        "click_screen_at" -> JsonObject().apply {
+            addProperty("x", 320.0)
+            addProperty("y", 180.0)
+            addProperty("button", 0)
+            addProperty("clickCount", 1)
+        }
+        "key_press" -> JsonObject().apply {
+            addProperty("key", "ESCAPE")
+            addProperty("pressTicks", 1)
+        }
+        "type_text" -> JsonObject().apply {
+            addProperty("text", "BlackBoxPro")
+            addProperty("intervalTicks", 0)
         }
         "close_screen" -> JsonObject()
         "create_world" -> JsonObject().apply {
@@ -492,6 +532,10 @@ object BlackBoxTestCatalog {
         "query_held_item" -> JsonObject().apply { addProperty("hand", "main_hand") }
         "query_inventory_slot" -> JsonObject().apply { addProperty("slot", 0) }
         "query_chat_history" -> JsonObject().apply { addProperty("count", 5) }
+        "query_chat_style" -> JsonObject().apply {
+            addProperty("match", "默认频道")
+            addProperty("index", 1)
+        }
         "query_nearby_entities" -> JsonObject().apply {
             addProperty("radius", 16.0)
             addProperty("limit", 20)
@@ -505,6 +549,37 @@ object BlackBoxTestCatalog {
         }
         "query_tab_list" -> JsonObject().apply { addProperty("limit", 10) }
         "query_scoreboard" -> JsonObject()
+        "query_cursor_state" -> JsonObject()
+        "query_germ_screen" -> JsonObject().apply {
+            addProperty("maxDepth", 4)
+            addProperty("maxComponents", 200)
+            addProperty("includeFields", false)
+        }
+        "query_germ_hit_test" -> JsonObject().apply {
+            addProperty("x", 320.0)
+            addProperty("y", 180.0)
+            addProperty("maxDepth", 4)
+            addProperty("maxComponents", 200)
+            addProperty("includeFields", true)
+        }
+        "click_germ_component" -> JsonObject().apply {
+            addProperty("x", 320.0)
+            addProperty("y", 180.0)
+            addProperty("button", 0)
+            addProperty("clickCount", 1)
+            addProperty("maxDepth", 4)
+            addProperty("maxComponents", 200)
+            addProperty("includeFields", false)
+            addProperty("fallbackScreenClick", false)
+        }
+        "germ_gui_part_dos" -> JsonObject().apply {
+            addProperty("guiName", "default")
+            addProperty("partId", "button")
+            addProperty("dosType", "click")
+            addProperty("execute", false)
+            addProperty("resolvePlaceholders", true)
+            addProperty("mode", "command_util")
+        }
         "query_slot_tooltip" -> JsonObject().apply { addProperty("slot", 0) }
         "screenshot" -> JsonObject().apply {
             addProperty("testId", ctx.testId)
@@ -594,9 +669,10 @@ object BlackBoxTestCatalog {
 
     private fun categoryOf(actionId: String): String = when {
         actionId.startsWith("query_") -> "query"
+        actionId == "germ_gui_part_dos" -> "germ"
         actionId in setOf("look_at", "look_at_entity", "look_at_block", "pathfind_to", "navigate_to", "break_block", "place_block_at", "attack", "use", "open_container", "container_transfer", "drop_inventory", "wait", "batch", "respawn", "craft_recipe") -> "composite"
         actionId in setOf("chat_message", "chat_command") -> "chat"
-        actionId in setOf("client_information", "player_abilities", "resource_pack_response", "screenshot", "connect_to_server", "close_screen", "create_world", "join_world", "leave_world") -> "client"
+        actionId in setOf("client_information", "player_abilities", "resource_pack_response", "screenshot", "move_mouse", "click_mouse", "click_screen_at", "click_germ_component", "key_press", "type_text", "connect_to_server", "close_screen", "create_world", "join_world", "leave_world") -> "client"
         actionId in setOf("custom_payload", "tab_complete", "keep_alive", "pong", "debug_sample_subscription", "chunk_batch_received") -> "debug"
         actionId in setOf("player_move", "player_move_look", "player_look", "player_on_ground", "confirm_teleportation", "move_vehicle", "paddle_boat", "player_input") -> "movement"
         actionId in setOf("dig_start", "dig_cancel", "dig_finish", "place_block", "use_item") -> "block"

@@ -1,0 +1,33 @@
+{
+  "id": "baseline-1122",
+  "minecraftVersion": "1.12.2",
+  "defaultCellConfig": "cells.json",
+  "sourceCellId": "cell-01",
+  "targetCellIds": [
+    "cell-02",
+    "cell-03",
+    "cell-04",
+    "cell-05"
+  ],
+  "pluginPatterns": [
+    "^BlackBoxPro-Plugin-.*\\.jar$",
+    "^PlayerCurrency.*\\.jar$",
+    "^PlayerPoints.*\\.jar$",
+    "^LuckPerms.*\\.jar$",
+    ".*GermPlugin.*\\.jar$",
+    ".*ProtocolLib.*\\.jar$",
+    ".*Vault.*\\.jar$",
+    ".*PlaceholderAPI.*\\.jar$"
+  ],
+  "botModPatterns": [
+    "^BlackBoxPro-forge-1\\.12\\.2-.*\\.jar$",
+    ".*GermMod.*\\.jar$",
+    "^辅助-jei\\.jar$"
+  ],
+  "botResourcePackPatterns": [
+    "^Minecraft-Mod-Language-Modpack\\.zip$"
+  ],
+  "botDefaultResourcePacks": [
+    "Minecraft-Mod-Language-Modpack.zip"
+  ]
+}

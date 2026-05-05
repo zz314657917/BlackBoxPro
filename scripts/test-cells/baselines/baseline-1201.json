@@ -1,0 +1,15 @@
+{
+  "id": "baseline-1201",
+  "minecraftVersion": "1.20.1",
+  "defaultCellConfig": "cells-1201.json",
+  "sourceCellId": "cell-06",
+  "targetCellIds": [
+    "cell-07",
+    "cell-08"
+  ],
+  "pluginPatterns": [
+    "^BlackBoxPro-Plugin-.*\\.jar$",
+    "^PlayerCurrency.*\\.jar$",
+    "^LuckPerms.*\\.jar$"
+  ]
+}

@@ -6,14 +6,15 @@ import com.blackboxpro.forge.util.requireInt
 import com.google.gson.JsonObject
 import net.minecraft.client.Minecraft
 import net.minecraft.inventory.ClickType
-import net.minecraft.item.ItemStack
 
 class ClickSlotAction : ActionExecutor {
     override fun execute(params: JsonObject): ActionResult {
         val mc = Minecraft.getMinecraft()
         val player = mc.player
             ?: return ActionResult.fail("Player not available")
-        val connection = mc.connection
+        val playerController = mc.playerController
+            ?: return ActionResult.fail("Player controller not available")
+        mc.connection
             ?: return ActionResult.fail("Not connected to server")
 
         val windowId = params.requireInt("windowId")
@@ -32,20 +33,14 @@ class ClickSlotAction : ActionExecutor {
             else -> return ActionResult.fail("Invalid mode: $mode (expected 0-6)")
         }
 
-        // 自动获取事务 ID 和点击的物品
-        val container = if (windowId == 0) player.inventoryContainer else player.openContainer
-        val actionNumber = container.getNextTransactionID(player.inventory)
-        val clickedItem = if (slot >= 0 && slot < container.inventorySlots.size) {
-            container.inventorySlots[slot].stack
-        } else {
-            ItemStack.EMPTY
+        val container = player.openContainer
+        if (container.windowId != windowId) {
+            return ActionResult.fail("Window mismatch: requested=$windowId current=${container.windowId}")
         }
 
-        connection.sendPacket(
-            net.minecraft.network.play.client.CPacketClickWindow(
-                windowId, slot, button, clickType, clickedItem, actionNumber
-            )
-        )
+        // Use the vanilla client click path so 1.12.2 computes slotClick locally
+        // before PlayerControllerMP sends the final CPacketClickWindow.
+        playerController.windowClick(windowId, slot, button, clickType, player)
         return ActionResult.ok("Clicked slot $slot in window $windowId (mode=$mode)")
     }
 }

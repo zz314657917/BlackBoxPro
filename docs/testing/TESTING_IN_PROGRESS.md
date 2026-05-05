@@ -205,7 +205,7 @@ plugin/build/libs/BlackBoxPro-Plugin-1.3.1.jar (2.1M) ✅ 已部署到服务端
 
 ## 📞 关键联系信息
 
-**项目仓库**: https://github.com/KunSs0/BlackBoxPro
+**项目仓库**: https://github.com/zz314657917/BlackBoxPro
 **当前分支**: main
 **测试开始时间**: 2026-03-21 17:40 UTC+8
 

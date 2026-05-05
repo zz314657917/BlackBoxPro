@@ -62,6 +62,7 @@ object ActionRegistry {
         register("interact_entity", InteractEntityAction())
         register("interact_entity_at", InteractEntityAtAction())
         register("swing_arm", SwingArmAction())
+        register("left_click", LeftClickAction())
 
         // === 容器/GUI 操作 ===
         register("click_slot", ClickSlotAction())
@@ -111,6 +112,11 @@ object ActionRegistry {
         register("leave_world", LeaveWorldAction())
         register("close_screen", CloseScreenAction())
         register("open_inventory", OpenInventoryAction())
+        register("move_mouse", MoveMouseAction())
+        register("click_mouse", ClickMouseAction())
+        register("click_screen_at", ClickScreenAtAction())
+        register("key_press", KeyPressAction())
+        register("type_text", TypeTextAction())
 
         // === 进阶交互 ===
         register("edit_book", EditBookAction())
@@ -170,8 +176,10 @@ object ActionRegistry {
         register("query_scoreboard", QueryScoreboardAction())
         register("query_screen_state", QueryScreenStateAction())
         register("query_boss_bar", QueryBossBarAction())
+        register("query_tooltip_state", QueryTooltipStateAction())
         register("query_chat_style", QueryChatStyleAction())
         register("query_slot_tooltip", QuerySlotTooltipAction())
+        register("query_cursor_state", QueryCursorStateAction())
 
         // === 玩家动作（新增）===
         register("jump", JumpAction())

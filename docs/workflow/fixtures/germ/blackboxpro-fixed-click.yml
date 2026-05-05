@@ -1,0 +1,41 @@
+blackboxpro_fixed_click:
+  options:
+    startX: "0"
+    startY: "0"
+    guide: false
+
+  background:
+    enable: true
+    type: 0
+    path: "local<->bg/shop/bg-1.png"
+    locationX: "w*0.32"
+    locationY: "h*0.28"
+    locationZ: "-100"
+    width: "w*0.36"
+    height: "h*0.32"
+
+  title:
+    type: 4
+    enable: true
+    align: "center"
+    scale: "1.2"
+    texts:
+      - "&fBlackBoxPro Germ fixed click"
+    locationX: "w*0.5"
+    locationY: "h*0.34"
+    locationZ: "10"
+
+  bbp_fixed_click_button:
+    type: 3
+    enable: true
+    defaultPath: "local<->bg/basic/buy2.png"
+    hoverPath: "local<->bg/basic/buy1.png"
+    width: "w*0.20"
+    height: "h*0.06"
+    locationX: "w*0.40"
+    locationY: "h*0.44"
+    locationZ: "20"
+    texts:
+      - "&aBBP_FIXED_CLICK"
+    clickDos:
+      - "chat<->BBP_GERM_FIXED_CLICK_MARKER"

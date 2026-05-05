@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "defaultCellId": "cell-06",
+  "defaults": {
+    "enabled": false,
+    "serverJar": "arclight-forge-1.20.1-1.0.6.jar",
+    "serverJava": "F:/minecraft/test-cells/server-cell-1201-06/jre/jdk-17.0.18+8-jre/bin/java.exe",
+    "serverMinMemoryMb": 1024,
+    "serverMaxMemoryMb": 1024,
+    "botJava": "F:/minecraft/test-cells/server-cell-1201-06/jre/jdk-17.0.18+8-jre/bin/javaw.exe",
+    "botMinMemoryMb": 1024,
+    "botMaxMemoryMb": 1024,
+    "botPlayer": "bot_player",
+    "botVersionName": "1.20.1-Forge_47.3.0",
+    "visitorName": "visitor_player",
+    "visitorUuid": "00000000-0000-0000-0000-000000000001",
+    "ownerName": "owner_player",
+    "ownerUuid": "00000000-0000-0000-0000-000000000002"
+  },
+  "cells": [
+    {
+      "id": "cell-06",
+      "label": "forge1201-cell-06",
+      "enabled": true,
+      "serverDir": "F:/minecraft/test-cells/server-cell-1201-06",
+      "playerDataDir": "F:/minecraft/test-cells/server-cell-1201-06/plugins/BlackBoxPro/playerdata",
+      "botWorkspaceRoot": "G:/MC/game/BlackBoxProTestCells/cell-06",
+      "botVersionDir": "G:/MC/game/BlackBoxProTestCells/cell-06/.minecraft/versions/1.20.1-Forge_47.3.0",
+      "assetsDir": "G:/MC/game/BlackBoxProTestCells/cell-06/.minecraft/assets",
+      "librariesDir": "G:/MC/game/BlackBoxProTestCells/cell-06/.minecraft/libraries",
+      "serverPort": 25615,
+      "pluginHttpPort": 38130,
+      "modHttpPort": 38131
+    },
+    {
+      "id": "cell-07",
+      "label": "forge1201-cell-07",
+      "enabled": true,
+      "serverDir": "F:/minecraft/test-cells/server-cell-1201-07",
+      "playerDataDir": "F:/minecraft/test-cells/server-cell-1201-07/plugins/BlackBoxPro/playerdata",
+      "botWorkspaceRoot": "G:/MC/game/BlackBoxProTestCells/cell-07",
+      "botVersionDir": "G:/MC/game/BlackBoxProTestCells/cell-07/.minecraft/versions/1.20.1-Forge_47.3.0",
+      "assetsDir": "G:/MC/game/BlackBoxProTestCells/cell-07/.minecraft/assets",
+      "librariesDir": "G:/MC/game/BlackBoxProTestCells/cell-07/.minecraft/libraries",
+      "serverPort": 25625,
+      "pluginHttpPort": 38140,
+      "modHttpPort": 38141
+    },
+    {
+      "id": "cell-08",
+      "label": "forge1201-cell-08",
+      "enabled": true,
+      "serverDir": "F:/minecraft/test-cells/server-cell-1201-08",
+      "playerDataDir": "F:/minecraft/test-cells/server-cell-1201-08/plugins/BlackBoxPro/playerdata",
+      "botWorkspaceRoot": "G:/MC/game/BlackBoxProTestCells/cell-08",
+      "botVersionDir": "G:/MC/game/BlackBoxProTestCells/cell-08/.minecraft/versions/1.20.1-Forge_47.3.0",
+      "assetsDir": "G:/MC/game/BlackBoxProTestCells/cell-08/.minecraft/assets",
+      "librariesDir": "G:/MC/game/BlackBoxProTestCells/cell-08/.minecraft/libraries",
+      "serverPort": 25635,
+      "pluginHttpPort": 38150,
+      "modHttpPort": 38151
+    }
+  ]
+}

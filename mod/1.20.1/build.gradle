@@ -1,0 +1,277 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.util.Properties
+
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'org.jetbrains.kotlin.jvm' version '2.2.0'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+def rootProps = new Properties()
+file('../../gradle.properties').withReader('UTF-8') { rootProps.load(it) }
+def resolvedVersion = rootProps.getProperty('version', '0.0.0')
+
+version = resolvedVersion
+group = 'com.blackboxpro'
+
+base {
+    archivesName = "BlackBoxPro-forge-${minecraft_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+println "Java: ${System.getProperty('java.version')}, JVM: ${System.getProperty('java.vm.version')} (${System.getProperty('java.vendor')}), Arch: ${System.getProperty('os.arch')}"
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+    copyIdeResources = true
+
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+        }
+
+        client {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            property 'mixin.env.remapRefMap', 'true'
+        }
+    }
+}
+
+sourceSets.main.java.srcDir('../../common/src/main/kotlin')
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://repo.tabooproject.org/repository/releases/'
+    }
+}
+
+configurations {
+    shadeReflex
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    implementation "com.google.code.gson:gson:2.10.1"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.0"
+    implementation "org.tabooproject.reflex:reflex:1.2.3"
+    shadeReflex "org.tabooproject.reflex:reflex:1.2.3"
+    shadeReflex "org.tabooproject.reflex:analyser:1.2.3"
+
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def replaceProperties = [
+        minecraft_version      : minecraft_version,
+        minecraft_version_range: minecraft_version_range,
+        forge_version          : forge_version,
+        forge_version_range    : forge_version_range,
+        loader_version_range   : loader_version_range,
+        mod_id                 : mod_id,
+        mod_name               : mod_name,
+        mod_license            : mod_license,
+        mod_version            : resolvedVersion,
+        mod_authors            : mod_authors,
+        mod_description        : mod_description,
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    exclude 'org/jetbrains/**'
+    exclude 'org/intellij/**'
+    exclude 'module-info.class'
+    exclude 'META-INF/versions/**'
+
+    manifest {
+        attributes([
+            'Specification-Title'     : mod_id,
+            'Specification-Vendor'    : mod_authors,
+            'Specification-Version'   : '1',
+            'Implementation-Title'    : project.name,
+            'Implementation-Version'  : project.version,
+            'Implementation-Vendor'   : mod_authors,
+            'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+        ])
+    }
+
+    from({
+        configurations.shadeReflex.files.collect { zipTree(it) }
+    }) {
+        exclude 'META-INF/**'
+        exclude 'org/objectweb/asm/**'
+        exclude 'org/apache/commons/**'
+        exclude 'kotlin/**'
+    }
+    from({
+        configurations.runtimeClasspath.files
+            .findAll { it.name.startsWith('kotlin-') }
+            .collect { zipTree(it) }
+    }) {
+        exclude 'META-INF/**'
+        exclude 'module-info.class'
+        exclude 'org/jetbrains/**'
+        exclude 'org/intellij/**'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    finalizedBy 'reobfJar'
+}
+
+tasks.register('sanitizeRuntimeJar') {
+    dependsOn tasks.named('reobfJar')
+
+    doLast {
+        def archive = tasks.named('jar', Jar).get().archiveFile.get().asFile
+        def extractDir = layout.buildDirectory.dir('tmp/sanitized-jar').get().asFile
+        def manifestFile = new File(extractDir, 'META-INF/MANIFEST.MF')
+        def sanitizedJar = new File(archive.parentFile, "${archive.name}.sanitized")
+
+        delete(extractDir, sanitizedJar)
+
+        copy {
+            from zipTree(archive)
+            into extractDir
+            exclude 'org/jetbrains/**'
+            exclude 'org/intellij/**'
+            exclude 'module-info.class'
+            exclude 'META-INF/versions/**'
+        }
+
+        ant.jar(destfile: sanitizedJar, manifest: manifestFile) {
+            fileset(dir: extractDir) {
+                exclude(name: 'META-INF/MANIFEST.MF')
+            }
+        }
+
+        delete(archive)
+        copy {
+            from sanitizedJar
+            into archive.parentFile
+            rename { archive.name }
+        }
+        delete(sanitizedJar)
+
+        if (!archive.exists()) {
+            throw new org.gradle.api.GradleException("Failed to restore sanitized archive: ${archive}")
+        }
+    }
+}
+
+tasks.named('build').configure {
+    finalizedBy tasks.named('sanitizeRuntimeJar')
+}
+
+tasks.register('prepareRunMods', Copy) {
+    dependsOn tasks.named('sanitizeRuntimeJar')
+    from(tasks.named('jar'))
+    into(layout.projectDirectory.dir('run/mods'))
+}
+
+tasks.register('devRunJar', Jar) {
+    archiveClassifier = 'dev-run'
+    from sourceSets.main.output
+
+    exclude 'org/jetbrains/**'
+    exclude 'org/intellij/**'
+    exclude 'module-info.class'
+    exclude 'META-INF/versions/**'
+
+    manifest {
+        attributes([
+            'Specification-Title'     : mod_id,
+            'Specification-Vendor'    : mod_authors,
+            'Specification-Version'   : '1',
+            'Implementation-Title'    : project.name,
+            'Implementation-Version'  : project.version,
+            'Implementation-Vendor'   : mod_authors,
+            'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+        ])
+    }
+
+    from({
+        configurations.shadeReflex.files.collect { zipTree(it) }
+    }) {
+        exclude 'META-INF/**'
+        exclude 'org/objectweb/asm/**'
+        exclude 'org/apache/commons/**'
+        exclude 'kotlin/**'
+    }
+    from({
+        configurations.runtimeClasspath.files
+            .findAll { it.name.startsWith('kotlin-') }
+            .collect { zipTree(it) }
+    }) {
+        exclude 'META-INF/**'
+        exclude 'module-info.class'
+        exclude 'org/jetbrains/**'
+        exclude 'org/intellij/**'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.register('cleanRunModsForDev') {
+    doLast {
+        delete(fileTree(layout.projectDirectory.dir('run/mods')) {
+            include "${base.archivesName.get()}-${project.version}.jar"
+            include "${base.archivesName.get()}-${project.version}-dev-run.jar"
+        })
+    }
+}
+
+tasks.register('prepareRunModsDev', Copy) {
+    dependsOn tasks.named('cleanRunModsForDev')
+    dependsOn tasks.named('devRunJar')
+    from(tasks.named('devRunJar'))
+    into(layout.projectDirectory.dir('run/mods'))
+}
+
+tasks.matching { it.name == 'runClient' }.configureEach {
+    dependsOn tasks.named('classes')
+    dependsOn tasks.named('prepareRunModsDev')
+    doFirst {
+        delete(layout.buildDirectory.file('resources/main/META-INF/mods.toml'))
+        logger.lifecycle("Using dev-run mod jar for runClient: {}", tasks.named('devRunJar').get().archiveFile.get().asFile)
+    }
+}
+
+tasks.matching { it.name != 'runClient' && it.name.startsWith('run') }.configureEach {
+    dependsOn tasks.named('prepareRunModsDev')
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+}
+
+tasks.withType(KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = '17'
+        freeCompilerArgs += ['-Xjvm-default=all']
+    }
+}

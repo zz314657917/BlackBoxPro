@@ -1,0 +1,23 @@
+package com.blackboxpro.forge.action.player
+
+import com.blackboxpro.forge.action.ActionExecutor
+import com.blackboxpro.forge.action.ActionResult
+import com.blackboxpro.forge.util.getIntOrDefault
+import com.google.gson.JsonObject
+import net.minecraft.client.Minecraft
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+
+class FinishUsingAction : ActionExecutor {
+    override fun execute(params: JsonObject): ActionResult {
+        val sequence = params.getIntOrDefault("sequence", 0)
+        val networkHandler = Minecraft.getInstance().connection
+            ?: return ActionResult.fail("Not connected to server")
+        networkHandler.send(
+            ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.RELEASE_USE_ITEM, BlockPos.ZERO, Direction.DOWN, sequence)
+        )
+        return ActionResult.ok("Finished using item")
+    }
+}
+

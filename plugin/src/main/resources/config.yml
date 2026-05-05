@@ -1,20 +1,6 @@
-# BlackBoxPro 服务端插件配置
-
-# 调试模式：开启后会在控制台输出收发的 JSON 消息，
-# 同时 exec/send 命令会输出完整的响应数据
+# BlackBoxPro plugin config
 debug: false
-
-# 等待客户端响应的默认超时时间（毫秒）
-# 对于 screenshot 等耗时操作，建议调大此值（如 15000）
 response-timeout-ms: 10000
-
-# BlackBoxPro HTTP 服务端口（测试脚本通过此端口发送指令）
 http-port: 38080
-
-# 测试模式
-# server_only: 纯服务端，Plugin HTTP Server 不转发给 Mod
-# dual:        双端联调，所有指令通过 Plugin 转发给 Mod HTTP Server
 test-mode: dual
-
-# Mod HTTP Server 地址（dual 模式下 Plugin 转发指令的目标地址）
 mod-http-address: "http://localhost:38081"

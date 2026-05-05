@@ -70,7 +70,7 @@
 
 ### 2. 检查可用 Action
 
-查阅 `reference/action-catalog.md` 后，当前公开动作里没有发现以下能力：
+查阅 `common/src/main/kotlin/com/blackboxpro/common/action/ActionCatalog.kt` 后，当前公开动作里没有发现以下能力：
 
 - 鼠标移动到 GUI 槽位
 - 悬浮指定槽位
