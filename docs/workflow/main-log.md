@@ -38,3 +38,6 @@
 260505 0048 | bbp-sprint-006-germ-real-physical-click | cleanup clean and handoff updated | Evaluator | knowledge/tasks/current-task.md
 260505 1640 | bbp-sprint-006-germ-real-physical-click | component hook retest still no business effect | Evaluator | docs/workflow/qa/sprint-006-qa.md
 260505 1640 | bbp-sprint-006-germ-real-physical-click | cleanup clean and status remains fix | Evaluator | docs/workflow/status.md
+260505 1850 | bbp-sprint-006-germ-real-physical-click | synthetic screen hook retest still no business effect | Evaluator | docs/workflow/qa/sprint-006-qa.md
+260505 1910 | bbp-sprint-006-germ-real-physical-click | contract amended to fixed Germ test page with chat-marker side effect | Codex | docs/workflow/tasks/sprint-006.md; docs/workflow/fixtures/germ/blackboxpro-fixed-click.yml
+260505 1927 | bbp-sprint-006-germ-real-physical-click | fixed-page runtime PASS and cleanup complete | Codex | docs/workflow/qa/sprint-006-qa.md

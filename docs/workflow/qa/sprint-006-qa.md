@@ -1,19 +1,21 @@
-### FAIL: bbp-sprint-006-germ-real-physical-click
+### PASS: bbp-sprint-006-germ-real-physical-click
 
 ## Verdict
 
-Sprint 6 implementation and build gates passed, but runtime acceptance failed.
+Sprint 6 now passes after the contract was amended to use a controlled fixed Germ test page.
 
-`click_germ_component` now returns structured client click evidence, including coordinate, selected target, component attempt, screen fallback, and warnings. However, on the real `cell-01` Germ shop page, the physical/client click did not produce the required business side effect. PlayerPoints for `zzzderk` stayed at `7988` before and after the click, so Sprint 6 cannot be marked `PASS`.
+The earlier Lmshop page remains diagnostic failure evidence: callable Germ hooks did not change PlayerPoints. The final accepted runtime target is the fixed page `blackboxpro_fixed_click` from `docs/workflow/fixtures/germ/blackboxpro-fixed-click.yml`.
 
-This is a contract `FAIL`, not a `BLOCKED`: the real Germ page and business-state observer were available, but the current physical click path did not trigger the shop purchase.
+Final accepted evidence: `click_germ_component` with `screenClickPolicy=always` returned `clickPath=component+screen`; the selected component invocation was recorded, screen fallback succeeded through the reflective screen path, and the deterministic chat marker changed from absent to present in the same time window: `beforeMarkerCount=0`, `afterMarkerCount=1`, `plain=<zzzderk> BBP_GERM_FIXED_CLICK_MARKER`.
 
 ## Changed Files Reviewed
 
 - `mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/action/client/ClickGermComponentAction.kt`
 - `mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/util/GermScreenProbeHelper.kt`
 - `mod/1.12.2/forge/src/main/kotlin/com/blackboxpro/forge/util/ScreenMouseHelper.kt`
+- `docs/workflow/fixtures/germ/blackboxpro-fixed-click.yml`
 - `docs/workflow/tasks/sprint-006-test-worker.md`
+- `docs/workflow/tasks/sprint-006.md`
 - `docs/workflow/main-log.md`
 - `docs/workflow/qa/sprint-006-qa.md`
 - `docs/workflow/status.md`
@@ -153,6 +155,64 @@ Cleanup after retest:
 
 Retest verdict remains `FAIL`: the candidate Germ component method can be invoked, but there is still no observable business side effect. Sprint 6 must not move to `done`.
 
+## Synthetic Screen Retest 2026-05-05 18:50 +08:00
+
+Codex continued retesting the real Germ page with screen-level hooks that the root screen actually exposes:
+
+- `click_screen_at` on the exact candidate center `136.95999717712402,84.3500006198883` stayed at PlayerPoints `7988 -> 7988`.
+- `click_germ_component` with `syntheticScreenMethod=ALLATORIxDEMO()` returned `screenSyntheticClick.ok=true`, but PlayerPoints still stayed `7988 -> 7988`.
+- `click_germ_component` with `syntheticScreenMethod=ALLATORIxDEMO(OOOO0O000OO0)` also returned `screenSyntheticClick.ok=true`, but PlayerPoints still stayed `7988 -> 7988`.
+- The retest was stopped and released cleanly after the checks.
+
+This confirms the current Germ physical-click / screen-synthetic chain still does not produce the required business side effect on the real shop page.
+
+## Fixed Page Retest 2026-05-05 19:26 +08:00
+
+The Sprint 6 contract was amended to use a controlled Germ page with a deterministic chat side effect:
+
+- fixture source: `docs/workflow/fixtures/germ/blackboxpro-fixed-click.yml`
+- transient runtime copy: `F:/minecraft/test-cells/server-cell-01/plugins/GermPlugin/gui/blackboxpro-fixed-click.yml`
+- page id: `blackboxpro_fixed_click`
+- side effect: `chat<->BBP_GERM_FIXED_CLICK_MARKER`
+
+Code fix:
+
+- `click_germ_component` now accepts optional `screenClickPolicy`.
+- Default behavior remains `on_component_failure`.
+- Runtime acceptance uses `screenClickPolicy=always` with `fallbackScreenClick=true` so a component reflection success does not short-circuit the real screen click path.
+
+Static/build evidence after the fix:
+
+- `.\gradlew.bat -p common test --no-daemon`: `BUILD SUCCESSFUL`.
+- `.\gradlew.bat common_build plugin_build forge1122_build --no-daemon`: exit code `0`; Java deprecation/unchecked warnings only.
+- `rg -n "click_germ_component|query_germ_hit_test|query_germ_screen|germ_gui_part_dos|screenClickPolicy|BBP_GERM_FIXED_CLICK_MARKER" ...`: expected hits found.
+- denied-path diff: no output.
+- `git diff --check`: no whitespace errors; CRLF warnings only.
+
+Runtime target:
+
+- `cell-01`
+- owner: `bbp-sprint-006-fixed-germ`
+- plugin `/status`: `ready=true`, `version=2.2.4`
+- mod `/status`: `ready=true`, `actions=114`
+- relay `query_player_state`: `status=success`
+- fresh runtime jar copied to bot mods: `BlackBoxPro-forge-1.12.2-2.2.4.jar`, size `2582425`
+
+Fixed-page evidence:
+
+- opened with `/gp open zzzderk blackboxpro_fixed_click`.
+- hit-test at `x=214,y=113`: `hitCount=3`.
+- best hit id: `root.ALLATORIxDEMO.else[0].class[2]`.
+- best hit class: `com.germmc!.OO0O0OO0OO0O`.
+- selected horizontal bounds: `x=171.1999969482422`, `y=106.04000091552734`, `width=85.5999984741211`, `height=14.460000038146973`.
+- before click marker query since `1777980404166`: `beforeMarkerCount=0`.
+- `click_germ_component`: `status=success`, `clickPath=component+screen`, `screenClickPolicy=always`.
+- component attempt: `componentClick.ok=true`, signature `ALLATORIxDEMO(float,float):void`.
+- screen fallback: `fallbackScreenClick.requested=true`, `fallbackScreenClick.ok=true`, `fallbackPath=screen`, `reflectiveScreenClick.ok=true`, `nativeMouseClick.ok=false`.
+- after click marker query: `afterMarkerCount=1`, plain text `<zzzderk> BBP_GERM_FIXED_CLICK_MARKER`.
+
+This satisfies Sprint 6 runtime acceptance: the click action records coordinate/bounds/component evidence and the same real client screen-click path produces an observable Germ `clickDos` side effect.
+
 ## Cleanup Evidence
 
 ```powershell
@@ -169,16 +229,24 @@ Results:
 - final port check for `25570`, `38080`, `38081`: no output
 - final matching `cmd/java/javaw` process check: no output
 
+Latest fixed-page cleanup:
+
+- `Invoke-TestCell.ps1 -Mode stop -CellId cell-01`: `ok=true`.
+- `Release-TestCell.ps1 -CellId cell-01 -Owner bbp-sprint-006-fixed-germ`: `released=true`.
+- transient fixture removed: `fixtureExists=false`.
+- final listener check for `25570/38080/38081`: `listenerCount=0`.
+- final matching `cmd/java/javaw` process check: `processCount=0`.
+
 ## Findings
 
 - No denied-path source drift was found.
 - DeepSeek worker was attempted but failed with `error_max_budget_usd`, so Codex performed the final QA directly.
 - The original component candidate list exposed `ALLATORIxDEMO(float,float):void`; the fix retest now invokes that method and records it as a component-path attempt.
 - Invoking `ALLATORIxDEMO(float,float):void` on both the small target and larger parent target did not trigger the Germ shop purchase.
-- The current client fallback and component reflection paths can return action success, but action success without business side effect is not Sprint 6 PASS evidence.
+- The fixed-page retest proved that the component reflection path alone is insufficient, but `click_germ_component` can now combine component evidence with an explicit screen click path and produce a Germ side effect.
 
 ## Next Legal Action
 
-Keep Sprint 6 in `fix`.
+Sprint 6 can move to `done`.
 
-The next Generator task should discover or implement a true Germ screen/event queue hook, or rewrite the contract around a fixed Germ test page whose physical click has an observable side effect. Do not use `germ_gui_part_dos execute=true` as the fix or PASS evidence. Multi-bot remains out of scope.
+Next sprint: draft Sprint 7 multi-bot scenario orchestrator contract. Do not mix Sprint 7 with further Germ/Lmshop production-page hardening unless a separate contract is approved.

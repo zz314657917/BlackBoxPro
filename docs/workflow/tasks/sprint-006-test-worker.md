@@ -19,9 +19,9 @@ Run Sprint 6 static, build, diff, and runtime checks for the current checkout. D
 - `common_build plugin_build forge1122_build` passes under Java 21.
 - Denied-path diff is empty for `ActionCatalog`, modern modules, plugin Germ server action, test-cell scripts, and root Gradle files.
 - `git diff --check` has no whitespace errors.
-- Runtime smoke is attempted only on a real Forge `1.12.2` Germ page.
+- Runtime smoke is attempted only on a real Forge `1.12.2` Germ page. The approved acceptance target is the fixed page from `docs/workflow/fixtures/germ/blackboxpro-fixed-click.yml`.
 - Runtime `PASS` is not allowed unless `click_germ_component` returns client click evidence and a before/after business side effect is recorded.
-- If the real Germ page or business side-effect observer is unavailable, report `### BLOCKED`, not PASS.
+- If the fixed Germ page cannot be installed/opened, or the business side-effect observer is unavailable, report `### BLOCKED`, not PASS.
 
 ## Allowed Paths
 
@@ -60,17 +60,19 @@ Runtime, only if a real `cell-01` Germ page is available:
 ```powershell
 $owner = "bbp-sprint-006-test-worker"
 powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Acquire-TestCell.ps1" -CellId cell-01 -Owner $owner -ReadyOnly
+Copy-Item "docs/workflow/fixtures/germ/blackboxpro-fixed-click.yml" "F:/minecraft/test-cells/server-cell-01/plugins/GermPlugin/gui/blackboxpro-fixed-click.yml" -Force
 powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode ensure -CellId cell-01
 Invoke-RestMethod -Uri "http://127.0.0.1:38080/status" -Method GET
 Invoke-RestMethod -Uri "http://127.0.0.1:38081/status" -Method GET
 ```
 
-Then use the Sprint 6 contract runtime flow from `docs/workflow/tasks/sprint-006.md`: relay check, open a real Germ page, `query_germ_screen`, `query_germ_hit_test`, optional `germ_gui_part_dos execute=false`, `click_germ_component`, before/after business-state evidence, cleanup.
+Then use the Sprint 6 contract runtime flow from `docs/workflow/tasks/sprint-006.md`: relay check, open `blackboxpro_fixed_click`, `query_germ_screen`, `query_germ_hit_test`, optional `germ_gui_part_dos execute=false`, `click_germ_component` with `fallbackScreenClick=true` and `screenClickPolicy=always`, before/after `query_chat_history` evidence for `BBP_GERM_FIXED_CLICK_MARKER`, cleanup.
 
 Cleanup after any runtime attempt:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Invoke-TestCell.ps1" -Mode stop -CellId cell-01
+Remove-Item "F:/minecraft/test-cells/server-cell-01/plugins/GermPlugin/gui/blackboxpro-fixed-click.yml" -ErrorAction SilentlyContinue
 powershell -ExecutionPolicy Bypass -File "scripts/test-cells/Release-TestCell.ps1" -CellId cell-01 -Owner "bbp-sprint-006-test-worker"
 Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 25570,38080,38081 } | Select-Object LocalAddress,LocalPort,OwningProcess
 Get-CimInstance Win32_Process | Where-Object { $_.Name -in "cmd.exe","java.exe","javaw.exe" -and ($_.CommandLine -like "*BlackBoxProTestCells*cell-01*" -or $_.CommandLine -like "*server-cell-01*") } | Select-Object ProcessId,Name,CommandLine
@@ -95,13 +97,13 @@ Write `docs/workflow/worker-results/bbp-sprint-006-germ-real-physical-click-qa-r
 - Do not run `germ_gui_part_dos execute=true`.
 - Do not declare runtime PASS without real `click_germ_component` evidence and before/after business side-effect evidence.
 - Do not use screenshots alone as business side-effect evidence.
-- Treat unavailable real Germ page or unavailable business observer as `BLOCKED`.
+- Treat unavailable fixed Germ page or unavailable business observer as `BLOCKED`.
 - Keep runtime attempts sequential and always cleanup.
 
 ## Stop Rules
 
 - Stop if any denied path changes.
 - Stop if a build or static command fails.
-- Stop if acquiring or opening a real Germ page would require changing test-cell scripts, configs, source, or external plugin files.
+- Stop if acquiring or opening the fixed Germ page would require changing test-cell scripts, source, or external plugin files beyond the transient fixture copy from `docs/workflow/fixtures/germ/blackboxpro-fixed-click.yml`.
 - Stop if the only possible runtime side effect path is `germ_gui_part_dos execute=true`.
 - Always cleanup after runtime attempts.

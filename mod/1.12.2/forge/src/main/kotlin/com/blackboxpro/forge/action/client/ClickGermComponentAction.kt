@@ -21,6 +21,7 @@ class ClickGermComponentAction : ActionExecutor {
             button = params.getIntOrDefault("button", 0),
             clickCount = params.getIntOrDefault("clickCount", 1),
             fallbackScreenClick = params.getBooleanOrDefault("fallbackScreenClick", false),
+            screenClickPolicy = params.getStringOrNull("screenClickPolicy") ?: "on_component_failure",
             syntheticEventMethod = params.getStringOrNull("syntheticEventMethod"),
             syntheticScreenMethod = params.getStringOrNull("syntheticScreenMethod")
         )

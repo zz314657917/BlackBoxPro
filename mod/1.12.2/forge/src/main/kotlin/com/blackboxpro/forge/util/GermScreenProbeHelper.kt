@@ -99,6 +99,7 @@ object GermScreenProbeHelper {
         val button: Int = 0,
         val clickCount: Int = 1,
         val fallbackScreenClick: Boolean = false,
+        val screenClickPolicy: String = "on_component_failure",
         val syntheticEventMethod: String? = null,
         val syntheticScreenMethod: String? = null
     )
@@ -422,7 +423,9 @@ object GermScreenProbeHelper {
             addProperty("requested", options.fallbackScreenClick)
             addProperty("ok", false)
         }
-        if (options.fallbackScreenClick && !componentSucceeded && !screenSyntheticSucceeded) {
+        val normalizedScreenClickPolicy = options.screenClickPolicy.trim().lowercase()
+        val forceScreenClick = normalizedScreenClickPolicy in setOf("always", "force", "after_component")
+        if (options.fallbackScreenClick && (forceScreenClick || (!componentSucceeded && !screenSyntheticSucceeded))) {
             val nativeFallback = runCatching {
                 ScreenMouseHelper.clickNativeMouseAtWithEvidence(
                     guiX = hitX,
@@ -498,7 +501,14 @@ object GermScreenProbeHelper {
                 addProperty("requested", true)
                 addProperty("ok", false)
                 addProperty("skipped", true)
-                addProperty("reason", "component-succeeded")
+                addProperty(
+                    "reason",
+                    when {
+                        componentSucceeded -> "component-succeeded"
+                        screenSyntheticSucceeded -> "screen-synthetic-succeeded"
+                        else -> "screen-click-policy:$normalizedScreenClickPolicy"
+                    }
+                )
             }
         }
         val clickSucceeded = componentSucceeded || screenSyntheticSucceeded || fallbackSucceeded
@@ -557,6 +567,7 @@ object GermScreenProbeHelper {
             })
             add("screenSyntheticClick", screenSyntheticJson)
             add("fallbackScreenClick", fallbackJson)
+            addProperty("screenClickPolicy", normalizedScreenClickPolicy)
             add("probeWarnings", warningArray)
         }
     }

@@ -2,58 +2,50 @@
 
 ## 背景
 
-- BlackBoxPro 当前处于 P/G/E Sprint 6：Germ 真实客户端物理点击证据链。
+- BlackBoxPro P/G/E Sprint 6：`bbp-sprint-006-germ-real-physical-click` 已完成。
 - Sprint 6 contract：`docs/workflow/tasks/sprint-006.md`。
-- 当前状态仍是 `fix`，不是 `PASS` / `done`。
-- 多 bot orchestrator、`germ_gui_part_dos execute=true` 替代物理点击、现代端同步都不属于当前 Sprint。
+- Sprint 6 QA：`docs/workflow/qa/sprint-006-qa.md`，首行 `### PASS: bbp-sprint-006-germ-real-physical-click`。
+- 多 bot orchestrator、Germ/Lmshop 生产页进一步 hardening、现代端同步都不属于已完成的 Sprint 6。
 
-## 当前目标
+## 已完成
 
-修复 Sprint 6 runtime QA 失败：让 `click_germ_component` 能在真实 Germ 页面触发客户端 Germ 点击路径，并产生可观察业务副作用。
-
-## 本次已完成
-
-- 强化了 Forge `1.12.2` `click_germ_component` 返回证据：
-  - selected coordinate
-  - target component and bounds
-  - component click report
-  - fallback screen click report
-  - probe warnings
-- 修正了组件候选判定：
-  - `component-shape` obfuscated numeric candidates 不再被静默跳过。
-  - 组件调用记录 `ok` 和 `handled`，避免把返回值语义和调用成功混在一起。
-  - `componentClick.coordinate` 记录 screen 坐标，并保留 relative 坐标。
-- Codex 完成 static/build/runtime QA；DeepSeek worker 先前因预算上限失败，没有可用 QA report。
-
-## 已确认事实
-
-- `common test` 通过。
-- `common_build plugin_build forge1122_build` 通过。
-- denied-path diff 为空：未改 `ActionCatalog`、现代端、plugin Germ server action、test-cell scripts 或 Gradle 配置。
-- `cell-01` plugin `/status` 和 mod `/status` 均 ready。
-- 真实 Germ 页面可打开：`/gp open zzzderk 分类商城正式模板`。
-- `query_germ_hit_test` 在 `x=138,y=84` 能命中 `商品2点券` 所在区域的 Germ 候选组件。
-- `germ_gui_part_dos execute=false` 能解析出 `商品2点券` 的 `lmshop buy 2 player_points <redacted-token>`，证明语义业务入口存在。
-- 最新 `click_germ_component` 能走 `component` 路径并调用 `ALLATORIxDEMO(float,float):void`。
-- PlayerPoints before/after 仍为 `7988 -> 7988`，真实点击未触发购买副作用。
-- 父级目标 `root.ALLATORIxDEMO.else[0].class[58]` 中心点也未触发副作用。
-- cleanup 已完成：`cell-01` stop/release 成功，`25570/38080/38081` 无监听，匹配 `cmd/java/javaw` 进程为 0。
-
-## 当前结论
-
-Sprint 6 当前仍为 `FAIL/fix`，不是 `PASS`。真实页面和业务状态观测口都可用，但当前组件反射路径没有业务副作用。
-
-## 下一步
-
-1. 动作：定位 Germ screen/event queue 真实点击 hook。
-   验证：`click_germ_component` 返回的路径不只是普通 obfuscated setter/paint/update 方法，而是能触发 Germ click event 或组件 callback。
-2. 动作：如果无法稳定定位 hook，重写 Sprint 6 contract 为固定 Germ 测试页。
-   验证：测试页提供明确 click side effect，例如 scoreboard、日志、GUI 状态或数据库可观测变化。
-3. 动作：重跑 static/build/runtime QA。
-   验证：`common test`、`common_build plugin_build forge1122_build`、denied-path diff、`git diff --check` 全部通过；runtime 有 before/after 业务副作用。
+- 固定 Germ 测试页已落库：`docs/workflow/fixtures/germ/blackboxpro-fixed-click.yml`。
+- `click_germ_component` 增加可选参数 `screenClickPolicy`：
+  - 默认 `on_component_failure`，保持原有 fallback 行为。
+  - Sprint 6 runtime 验收使用 `screenClickPolicy=always`，避免组件反射调用成功后跳过真实 screen click。
+- 固定页 runtime smoke 通过：
+  - 页面：`blackboxpro_fixed_click`
+  - 命令：`/gp open zzzderk blackboxpro_fixed_click`
+  - 点击点：`x=214,y=113`
+  - hit best id：`root.ALLATORIxDEMO.else[0].class[2]`
+  - hit best class：`com.germmc!.OO0O0OO0OO0O`
+  - selected bounds：`x=171.1999969482422`, `y=106.04000091552734`, `width=85.5999984741211`, `height=14.460000038146973`
+  - `click_germ_component`：`clickPath=component+screen`
+  - component signature：`ALLATORIxDEMO(float,float):void`
+  - fallback：`fallbackScreenClick.ok=true`, `fallbackPath=screen`, `reflectiveScreenClick.ok=true`
+  - side effect：`query_chat_history` 从 `beforeMarkerCount=0` 到 `afterMarkerCount=1`
+  - marker：`<zzzderk> BBP_GERM_FIXED_CLICK_MARKER`
 
 ## 验证记录
 
-- `2026-05-05 00:48 +08:00`：`docs/workflow/qa/sprint-006-qa.md` 首行 `### FAIL: bbp-sprint-006-germ-real-physical-click`。
-- `2026-05-05 16:40 +08:00`：component hook retest 仍失败；`ALLATORIxDEMO(float,float):void` 可调用，但 PlayerPoints `7988 -> 7988`。
-- cleanup：stop `ok=true`，release `released=true`，端口/进程检查为 0。
+- `.\gradlew.bat -p common test --no-daemon`：`BUILD SUCCESSFUL`。
+- `.\gradlew.bat common_build plugin_build forge1122_build --no-daemon`：exit code `0`，仅 Java deprecation/unchecked warnings。
+- static search 覆盖 `click_germ_component` / Germ query / `germ_gui_part_dos` / `screenClickPolicy` / fixed marker。
+- denied-path diff 为空：未改 `ActionCatalog`、现代端、plugin Germ server action、test-cell scripts 或 Gradle 配置。
+- `git diff --check`：无 whitespace error，仅 CRLF warning。
+- runtime cleanup：
+  - `cell-01` stop `ok=true`
+  - release `released=true`
+  - transient Germ fixture removed：`fixtureExists=false`
+  - `25570/38080/38081` listener count `0`
+  - matching `cmd/java/javaw` process count `0`
+
+## 当前结论
+
+Sprint 6 可以视为 `done`。真实 Lmshop 页面仍是诊断失败证据：组件/屏幕 hook 可调用但未产生 PlayerPoints 业务副作用；后续如果要继续 harden Lmshop 生产页，需要单独开 contract。
+
+## 下一步
+
+1. 起草 Sprint 7 multi-bot scenario orchestrator contract。
+2. 保持边界：一个真实客户端进程对应一个玩家身份；多 bot 由 repo 侧 orchestrator 编排多个 cell，不塞进单个 Mod。
+3. 不把 Sprint 7 和 Germ/Lmshop 生产页进一步 hardening 混在一个 Sprint。

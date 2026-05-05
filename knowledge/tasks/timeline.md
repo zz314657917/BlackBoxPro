@@ -1,5 +1,15 @@
 # BlackBoxPro 时间轴
 
+## 2026-05-05 19:27 +08:00 - Sprint 6 fixed Germ page PASS
+
+- Sprint 6 contract 已从 Lmshop 生产样页验收切到固定 Germ 测试页：`docs/workflow/fixtures/germ/blackboxpro-fixed-click.yml`。
+- `click_germ_component` 增加可选 `screenClickPolicy`；默认 `on_component_failure` 保持原行为，验收用 `always` 让组件反射成功后仍执行 screen click。
+- 固定页 `blackboxpro_fixed_click` 在 `cell-01` 通过 runtime smoke：`clickPath=component+screen`，component signature `ALLATORIxDEMO(float,float):void`，screen fallback `reflectiveScreenClick.ok=true`。
+- 验收副作用为聊天 marker：同一 since 窗口内 `beforeMarkerCount=0`，点击后 `afterMarkerCount=1`，内容 `<zzzderk> BBP_GERM_FIXED_CLICK_MARKER`。
+- 构建/静态门禁通过：`common test` 成功，`common_build plugin_build forge1122_build` exit code `0`，denied-path diff 为空，`git diff --check` 无 whitespace error。
+- cleanup 完成：`cell-01` stop/release 成功，临时 Germ fixture 已移除，`25570/38080/38081` 无监听，匹配 `cmd/java/javaw` 进程为 0。
+- Sprint 6 状态推进到 `done`；下一步是 Sprint 7 multi-bot scenario orchestrator contract。
+
 ## 2026-05-05 16:40 +08:00 - Sprint 6 component hook retest still failed
 
 - Sprint 6 remains `fix`, not `done`.
@@ -107,3 +117,9 @@
 
 - `cell-01..05`、`cell-10`、`cell-20..22` 的 1.12.2 测试服统一为超平坦基线。
 - 这一步收紧了 1.12.2 smoke 的环境差异，减少 world 配置漂移。
+
+## 2026-05-05 18:50 +08:00 - Sprint 6 Germ physical click retest stayed fail
+
+- 在 `cell-01` 上继续测了 Germ 真实物理点击链路。
+- `click_germ_component`、`click_screen_at` 和 root synthetic screen hook `ALLATORIxDEMO(OOOO0O000OO0)` 都可调用，但 PlayerPoints 仍然是 `7988 -> 7988`。
+- 这次 retest 结束后已 stop / release，端口和进程收口为 0。
